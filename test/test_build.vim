@@ -107,13 +107,14 @@ call assert_true(abs(s:st.world.tax_rates['JAP'] - 0.10) < 0.0001)
 call vimtoria#core#action('tax_down')
 call vimtoria#core#action('tax_down')
 call assert_true(abs(s:st.world.tax_rates['JAP'] - 0.05) < 0.0001)
-" 上限・下限でクランプ
+" 上限は税制の法律で決まる(日本の初期は地租 = 15%)
 let s:i = 0
 while s:i < 20
   call vimtoria#core#action('tax_up')
   let s:i += 1
 endwhile
-call assert_true(abs(s:st.world.tax_rates['JAP'] - s:eco.const.tax_max) < 0.0001)
+call assert_true(abs(s:st.world.tax_rates['JAP']
+      \ - s:st.world.law_mods['JAP'].tax_max) < 0.0001)
 call vimtoria#core#action('back')
 
 " ---- 建設メニュー操作と投入アクション ----

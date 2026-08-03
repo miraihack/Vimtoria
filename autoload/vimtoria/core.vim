@@ -89,11 +89,9 @@ function! vimtoria#core#action(name) abort
   elseif a:name =~# '^nav_[hjkl]$'
     if l:st.screen ==# 'map'
       let l:st.selected = vimtoria#map#neighbor(l:st.selected, a:name[4:])
-    elseif l:st.screen ==# 'construction' || l:st.screen ==# 'tech'
+    elseif s:menu_len(l:st) > 0
       " メニュー画面では j/k が項目選択
-      let l:n = l:st.screen ==# 'construction'
-            \ ? len(vimtoria#data#economy().buildings_order)
-            \ : len(vimtoria#data#tech().order)
+      let l:n = s:menu_len(l:st)
       if a:name ==# 'nav_j' && l:st.menu_idx < l:n - 1
         let l:st.menu_idx += 1
       elseif a:name ==# 'nav_k' && l:st.menu_idx > 0
@@ -117,6 +115,26 @@ function! vimtoria#core#action(name) abort
       let l:st.msg = empty(l:err)
             \ ? l:data.techs[l:tid].name . ' の研究を開始しました'
             \ : l:err
+    elseif l:st.screen ==# 'politics'
+      let l:data = vimtoria#data#politics()
+      let l:lid = l:data.law_order[l:st.menu_idx]
+      let l:err = vimtoria#politics#start_enact(l:st.world, l:st.country, l:lid)
+      let l:st.msg = empty(l:err)
+            \ ? l:data.laws[l:lid].name . ' の制定を開始しました'
+            \ : l:err
+    endif
+  elseif a:name =~# '^dip_'
+    if l:st.screen ==# 'diplo'
+      call s:diplo_action(l:st, a:name)
+    endif
+  elseif a:name ==# 'mil_recruit' || a:name ==# 'mil_disband'
+    if l:st.screen ==# 'military'
+      let l:err = a:name ==# 'mil_recruit'
+            \ ? vimtoria#war#recruit(l:st.world, l:st.country)
+            \ : vimtoria#war#disband(l:st.world, l:st.country)
+      let l:st.msg = empty(l:err)
+            \ ? (a:name ==# 'mil_recruit' ? '5個連隊を徴募しました' : '5個連隊を解散しました')
+            \ : l:err
     endif
   elseif a:name ==# 'cancel'
     if l:st.screen ==# 'construction'
@@ -128,8 +146,12 @@ function! vimtoria#core#action(name) abort
       let l:eco = vimtoria#data#economy()
       let l:rate = l:st.world.tax_rates[l:st.country]
       let l:rate += a:name ==# 'tax_up' ? l:eco.const.tax_step : -l:eco.const.tax_step
-      if l:rate > l:eco.const.tax_max
-        let l:rate = l:eco.const.tax_max
+      " 上限は税制の法律で決まる(地租 15% / 所得税 30%)
+      let l:max = l:st.world.law_mods[l:st.country].tax_max
+      if l:rate > l:max
+        let l:rate = l:max
+        let l:st.msg = printf('現行の税制では %.0f%% が上限です(gv で税制を変更)',
+              \ l:max * 100.0)
       elseif l:rate < l:eco.const.tax_min
         let l:rate = l:eco.const.tax_min
       endif
@@ -200,8 +222,77 @@ function! vimtoria#core#load() abort
   return 1
 endfunction
 
+" 画面ごとのメニュー項目数(0 ならメニュー無し)
+function! s:menu_len(st) abort
+  if a:st.screen ==# 'construction'
+    return len(vimtoria#data#economy().buildings_order)
+  elseif a:st.screen ==# 'tech'
+    return len(vimtoria#data#tech().order)
+  elseif a:st.screen ==# 'politics'
+    return len(vimtoria#data#politics().law_order)
+  elseif a:st.screen ==# 'diplo'
+    return len(vimtoria#core#diplo_targets(a:st))
+  endif
+  return 0
+endfunction
+
+" 外交画面の相手国リスト(自国を除いた固定順)
+function! vimtoria#core#diplo_targets(st) abort
+  return filter(copy(vimtoria#data#map().country_order),
+        \ 'v:val !=# a:st.country')
+endfunction
+
+function! s:diplo_action(st, name) abort
+  let l:targets = vimtoria#core#diplo_targets(a:st)
+  let l:other = l:targets[a:st.menu_idx]
+  let l:map = vimtoria#data#map()
+  let l:world = a:st.world
+  if a:name ==# 'dip_improve'
+    let l:err = vimtoria#diplo#improve(l:world, a:st.country, l:other, a:st.day)
+    let a:st.msg = empty(l:err)
+          \ ? l:map.countries[l:other].name . ' との関係を改善しました'
+          \ : l:err
+  elseif a:name ==# 'dip_alliance'
+    let l:was = vimtoria#diplo#allied(l:world, a:st.country, l:other)
+    let l:err = vimtoria#diplo#toggle_alliance(l:world, a:st.country, l:other)
+    let a:st.msg = empty(l:err)
+          \ ? l:map.countries[l:other].name
+          \   . (l:was ? ' との同盟を破棄しました' : ' と同盟を結びました')
+          \ : l:err
+  elseif a:name ==# 'dip_war'
+    " 奪取目標: マップで選択中の州が相手領ならそこ、でなければ相手の最弱州
+    let l:goal = l:world.owner[a:st.selected] ==# l:other
+          \ ? a:st.selected : s:weakest_of(l:world, l:other)
+    if empty(l:goal)
+      let a:st.msg = '相手国に州がありません'
+      return
+    endif
+    let l:err = vimtoria#diplo#declare_war(l:world, a:st.country, l:other,
+          \ l:goal, a:st.day, a:st.country)
+    let a:st.msg = empty(l:err)
+          \ ? printf('%s に宣戦布告(目標: %s)',
+          \          l:map.countries[l:other].name, l:map.states[l:goal].name)
+          \ : l:err
+  elseif a:name ==# 'dip_peace'
+    let l:err = vimtoria#diplo#white_peace(l:world, a:st.country, l:other, a:st.day)
+    let a:st.msg = empty(l:err) ? '白紙和平が成立しました' : l:err
+  endif
+endfunction
+
+function! s:weakest_of(world, cid) abort
+  let l:best = ''
+  let l:min = 1.0e18
+  for l:sid in a:world.country_states[a:cid]
+    if a:world.workforce[l:sid] < l:min
+      let l:min = a:world.workforce[l:sid]
+      let l:best = l:sid
+    endif
+  endfor
+  return l:best
+endfunction
+
 function! vimtoria#core#quit() abort
-  if confirm('Vimtoria を終了しますか?(M0 ではセーブされません)', "&Yes\n&No", 2) != 1
+  if confirm('Vimtoria を終了しますか?(S でセーブできます)', "&Yes\n&No", 2) != 1
     return
   endif
   call vimtoria#ui#close()

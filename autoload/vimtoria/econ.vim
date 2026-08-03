@@ -59,11 +59,36 @@ function! vimtoria#econ#init(state) abort
     let l:world.stats[l:cid] = {'gdp': 0.0, 'income': 0.0, 'sol': 1.0,
           \ 'workforce': 0.0, 'unemployed': 0.0,
           \ 'tax': 0.0, 'upkeep': 0.0, 'spend': 0.0,
-          \ 'interest': 0.0, 'credit': 0.0}
+          \ 'interest': 0.0, 'credit': 0.0, 'mil': 0.0}
   endfor
+  " 州の所有権(併合で変わる)
+  let l:world.owner = {}
+  for [l:sid, l:stt] in items(l:map.states)
+    let l:world.owner[l:sid] = l:stt.country
+  endfor
+  let l:world.map_version = 0
+  call vimtoria#econ#rebuild_country_states(l:world)
   call vimtoria#tech#init_world(l:world)
   call vimtoria#events#init_world(l:world)
+  call vimtoria#politics#init_world(l:world)
+  call vimtoria#diplo#init_world(l:world)
+  call vimtoria#war#init_world(l:world)
   let a:state.world = l:world
+endfunction
+
+" world.owner から国 → 州リストを組み直す(併合時にも呼ばれる)
+function! vimtoria#econ#rebuild_country_states(world) abort
+  let l:cs = {}
+  for l:cid in keys(vimtoria#data#map().countries)
+    let l:cs[l:cid] = []
+  endfor
+  for [l:sid, l:cid] in items(a:world.owner)
+    call add(l:cs[l:cid], l:sid)
+  endfor
+  for l:cid in keys(l:cs)
+    call sort(l:cs[l:cid])
+  endfor
+  let a:world.country_states = l:cs
 endfunction
 
 function! vimtoria#econ#tick(state) abort
@@ -71,6 +96,9 @@ function! vimtoria#econ#tick(state) abort
   for l:cid in keys(l:map.countries)
     call s:tick_country(a:state.world, l:cid, a:state.country, a:state.day)
   endfor
+  " 戦争と外交の週次処理(全世界で1回)
+  call vimtoria#war#tick(a:state.world, a:state.day)
+  call vimtoria#diplo#tick(a:state.world)
   let a:state.treasury = float2nr(a:state.world.treasuries[a:state.country])
 endfunction
 
@@ -88,10 +116,15 @@ function! vimtoria#econ#state_info(state, sid) abort
 endfunction
 
 function! s:tick_country(world, cid, player, day) abort
+  " 全州を失った国は経済が回らない
+  if empty(a:world.country_states[a:cid])
+    return
+  endif
   let l:eco = vimtoria#data#economy()
   let l:map = vimtoria#data#map()
   let l:market = a:world.markets[a:cid]
   let l:mods = a:world.mods[a:cid]
+  let l:lm = a:world.law_mods[a:cid]
 
   " ランダムイベント(期限処理・抽選・倍率再計算)
   call vimtoria#events#tick(a:world, a:cid, a:day, a:cid ==# a:player)
@@ -116,14 +149,14 @@ function! s:tick_country(world, cid, player, day) abort
   let l:owners = 0.0
   let l:subsist = 0.0
   let l:workforce_total = 0.0
-  for l:sid in l:map.country_states[a:cid]
+  for l:sid in a:world.country_states[a:cid]
     let l:workforce_total += a:world.workforce[l:sid]
     let l:employed = 0.0
     for [l:bid, l:b] in items(a:world.buildings[l:sid])
       let l:bdef = l:eco.buildings[l:bid]
       let l:eff = l:b.levels * l:b.f
       let l:om = get(l:mods.out, l:bid, 1.0) * l:evm.out_all
-            \ * get(l:evm.out, l:bid, 1.0)
+            \ * get(l:evm.out, l:bid, 1.0) * get(l:lm.out, l:bid, 1.0)
       for [l:gid, l:q] in items(l:bdef.out)
         let l:sell[l:gid] += l:q * l:om * l:eff
       endfor
@@ -151,6 +184,11 @@ function! s:tick_country(world, cid, player, day) abort
   if l:mods.rail
     let l:buy['coal'] += l:workforce_total * l:eco.const.rail_coal_per_k
   endif
+  " 軍需(連隊の物資消費)
+  let l:regiments = a:world.military[a:cid].regiments
+  for [l:gid, l:q] in items(l:eco.mil_goods)
+    let l:buy[l:gid] += l:q * l:regiments
+  endfor
   " 建設キューの資材需要
   call vimtoria#build#demand(a:world, a:cid, l:buy)
 
@@ -171,7 +209,9 @@ function! s:tick_country(world, cid, player, day) abort
   let l:unemployed_total = 0.0
   let l:state_unemp = {}
   let l:state_unfilled = {}
-  for l:sid in l:map.country_states[a:cid]
+  let l:wage_share = l:lm.wage_share
+  let l:income_by_prof = {}
+  for l:sid in a:world.country_states[a:cid]
     let l:workforce = a:world.workforce[l:sid]
     let l:employed = 0.0
     for [l:bid, l:b] in items(a:world.buildings[l:sid])
@@ -185,7 +225,7 @@ function! s:tick_country(world, cid, player, day) abort
       let l:bdef = l:eco.buildings[l:bid]
       let l:eff = l:b.levels * l:b.f
       let l:om = get(l:mods.out, l:bid, 1.0) * l:evm.out_all
-            \ * get(l:evm.out, l:bid, 1.0)
+            \ * get(l:evm.out, l:bid, 1.0) * get(l:lm.out, l:bid, 1.0)
       let l:rev = 0.0
       for [l:gid, l:q] in items(l:bdef.out)
         let l:rev += l:q * l:om * l:eff * l:market[l:gid].price
@@ -198,8 +238,20 @@ function! s:tick_country(world, cid, player, day) abort
       let l:b.gross = l:gross
       let l:gdp += l:rev
       if l:gross > 0.0
-        let l:wages_total += l:gross * l:eco.const.wage_share
-        let l:div_total += l:gross * (1.0 - l:eco.const.wage_share)
+        let l:wage_fund = l:gross * l:wage_share
+        let l:div_fund = l:gross * (1.0 - l:wage_share)
+        let l:wages_total += l:wage_fund
+        let l:div_total += l:div_fund
+        " 職業別所得(利益集団の勢力計算に使う)
+        for [l:prof, l:n] in items(l:bdef.jobs)
+          if l:eco.professions[l:prof].owner
+            let l:income_by_prof[l:prof] = get(l:income_by_prof, l:prof, 0.0)
+                  \ + l:div_fund * l:n / l:bdef.owners_pl
+          else
+            let l:income_by_prof[l:prof] = get(l:income_by_prof, l:prof, 0.0)
+                  \ + l:wage_fund * l:n / l:bdef.workers_pl
+          endif
+        endfor
       endif
       " 黒字なら雇用を増やし(失業者がいれば)、赤字なら減らす
       if l:gross > 0.0 && l:unemployed > 0.5 && l:b.f < 1.0
@@ -230,13 +282,19 @@ function! s:tick_country(world, cid, player, day) abort
     let l:subsist_total += l:unemployed * l:eco.const.subsist_income
   endfor
 
-  " --- 4. 財政(課税 → 維持費 → 利払い → 建設)・研究・AI ---
+  " --- 4. 財政(課税 → 維持費 → 軍事費 → 利払い → 建設)・研究・AI ---
+  " 自給農の所得は農民に計上する
+  let l:income_by_prof['farmers'] = get(l:income_by_prof, 'farmers', 0.0)
+        \ + l:subsist_total
   let l:tax_rate = a:world.tax_rates[a:cid]
   let l:income = l:wages_total + l:div_total + l:subsist_total
   let l:tax = l:income * l:tax_rate
   let a:world.treasuries[a:cid] += l:tax
   let l:upkeep = l:workforce_total * l:eco.const.upkeep_per_k
   let a:world.treasuries[a:cid] -= l:upkeep
+  " 軍事費(払えないほどの債務なら自然減)
+  let l:mil_cost = l:regiments * l:eco.const.mil_upkeep_money
+  let a:world.treasuries[a:cid] -= l:mil_cost
   " 国債: 負の国庫には週割り金利がかかる
   let l:interest = 0.0
   if a:world.treasuries[a:cid] < 0.0
@@ -245,6 +303,11 @@ function! s:tick_country(world, cid, player, day) abort
   endif
   " 建設は信用限度(週間所得 × credit_mult)まで借金しながら進められる
   let l:credit = l:income * l:eco.const.credit_mult
+  " 深い債務では軍が維持できず縮小する
+  if a:world.treasuries[a:cid] < -l:credit
+    let a:world.military[a:cid].regiments *=
+          \ (1.0 - l:eco.const.mil_debt_disband)
+  endif
   let l:spend = vimtoria#build#progress(a:world, a:cid, l:credit)
   " 研究(イベントの研究力倍率込み)
   call vimtoria#tech#tick(a:world, a:cid,
@@ -252,7 +315,7 @@ function! s:tick_country(world, cid, player, day) abort
         \ * l:evm.research)
   " AI 国の意思決定
   if a:cid !=# a:player
-    call vimtoria#ai#decide(a:world, a:cid)
+    call vimtoria#ai#decide(a:world, a:cid, a:day, a:player)
   endif
 
   " --- 5. 州間の職業移動(失業者 → 欠員のある州) ---
@@ -282,6 +345,11 @@ function! s:tick_country(world, cid, player, day) abort
   if l:workforce_total > 0.0 && l:basket > 0.0
     let l:sol = l:income * (1.0 - l:tax_rate) / l:workforce_total / l:basket
   endif
+
+  " --- 政治(勢力・法律制定・急進性・反乱) ---
+  call vimtoria#politics#tick(a:world, a:cid, l:income_by_prof, l:sol,
+        \ a:day, a:cid ==# a:player)
+
   let a:world.stats[a:cid] = {
         \ 'gdp': l:gdp,
         \ 'income': l:income,
@@ -293,5 +361,6 @@ function! s:tick_country(world, cid, player, day) abort
         \ 'spend': l:spend,
         \ 'interest': l:interest,
         \ 'credit': l:credit,
+        \ 'mil': l:mil_cost,
         \ }
 endfunction

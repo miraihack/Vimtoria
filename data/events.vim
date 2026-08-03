@@ -52,4 +52,9 @@ let g:vimtoria_data_events.events = {
       \ 'immigration': {
       \   'name': '移民の流入', 'desc': '新天地を求め、一州の労働力 +3%',
       \   'effects': {'workforce_pct': 0.03, 'duration': 0}},
+      \ 'uprising': {
+      \   'name': '反乱', 'desc': '急進派の蜂起で全建物の産出 -20%(12週)',
+      \   'effects': {'out_all': 0.8, 'duration': 12}},
       \ }
+" 注: uprising は order(ランダム抽選プール)に含まれず、
+"     急進性が高いときに政治システムから直接発火する

@@ -11,7 +11,7 @@ function! vimtoria#screens#pops#render(st) abort
   for l:prof in keys(l:eco.professions)
     let l:by_prof[l:prof] = 0.0
   endfor
-  for l:sid in l:map.country_states[a:st.country]
+  for l:sid in a:st.world.country_states[a:st.country]
     for [l:bid, l:b] in items(a:st.world.buildings[l:sid])
       for [l:prof, l:n] in items(l:eco.buildings[l:bid].jobs)
         let l:by_prof[l:prof] += l:n * l:b.levels * l:b.f
@@ -38,7 +38,7 @@ function! vimtoria#screens#pops#render(st) abort
   call add(l:lines, '  ── 州別(失業者は毎週、求人のある州へ少しずつ移動する) ──')
   call add(l:lines, '    ' . vimtoria#ui#pad('州', 12)
         \ . printf('%10s %10s %10s', '労働力', '雇用', '自給農'))
-  for l:sid in l:map.country_states[a:st.country]
+  for l:sid in a:st.world.country_states[a:st.country]
     let l:info = vimtoria#econ#state_info(a:st, l:sid)
     call add(l:lines, printf('    %s%9.0f千 %9.0f千 %9.0f千',
           \ vimtoria#ui#pad(l:map.states[l:sid].name, 12),

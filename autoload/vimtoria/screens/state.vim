@@ -6,8 +6,9 @@ function! vimtoria#screens#state#render(st) abort
   let l:eco = vimtoria#data#economy()
   let l:id = empty(a:st.screen_arg) ? a:st.selected : a:st.screen_arg
   let l:stt = l:data.states[l:id]
-  let l:country = l:data.countries[l:stt.country]
-  let l:own = l:stt.country ==# a:st.country ? '(自国)' : ''
+  let l:ocid = a:st.world.owner[l:id]
+  let l:country = l:data.countries[l:ocid]
+  let l:own = l:ocid ==# a:st.country ? '(自国)' : ''
   let l:info = vimtoria#econ#state_info(a:st, l:id)
 
   let l:lines = []

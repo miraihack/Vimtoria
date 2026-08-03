@@ -25,6 +25,26 @@ function! vimtoria#data#events() abort
   return s:events_cache
 endfunction
 
+let s:politics_cache = {}
+
+function! vimtoria#data#politics() abort
+  if empty(s:politics_cache)
+    execute 'source' fnameescape(s:root . '/data/politics.vim')
+    let s:politics_cache = g:vimtoria_data_politics
+  endif
+  return s:politics_cache
+endfunction
+
+let s:diplomacy_cache = {}
+
+function! vimtoria#data#diplomacy() abort
+  if empty(s:diplomacy_cache)
+    execute 'source' fnameescape(s:root . '/data/diplomacy.vim')
+    let s:diplomacy_cache = g:vimtoria_data_diplomacy
+  endif
+  return s:diplomacy_cache
+endfunction
+
 function! vimtoria#data#map() abort
   if !empty(s:map_cache)
     return s:map_cache

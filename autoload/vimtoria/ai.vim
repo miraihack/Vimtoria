@@ -5,18 +5,26 @@ scriptencoding utf-8
 " 建設: キューに余裕があり国庫が潤っていれば、市場で最も割高な財
 "       (価格/基準比が最大)を産出する建物を、失業者の最も多い自国州に建てる。
 
-function! vimtoria#ai#decide(world, cid) abort
+function! vimtoria#ai#decide(world, cid, day, player) abort
   call s:decide_research(a:world, a:cid)
   call s:decide_budget(a:world, a:cid)
   call s:decide_build(a:world, a:cid)
+  " 外交判断は重い(全ペア走査)ので 4 週間隔・国ごとに位相をずらして分散
+  if (a:day / 7 + char2nr(a:cid[0]) + char2nr(a:cid[2])) % 4 == 0
+    call vimtoria#diplo#ai(a:world, a:cid, a:day, a:player)
+  endif
 endfunction
 
-" 財政: 国庫が細れば増税(上限15%)、潤えば減税して生活水準を戻す
+" 財政: 国庫が細れば増税(法律の上限まで、最大15%)、潤えば減税
 function! s:decide_budget(world, cid) abort
   let l:eco = vimtoria#data#economy()
   let l:t = a:world.treasuries[a:cid]
   let l:rate = a:world.tax_rates[a:cid]
-  if l:t < l:eco.const.ai_build_reserve && l:rate < 0.15
+  let l:cap = a:world.law_mods[a:cid].tax_max
+  if l:cap > 0.15
+    let l:cap = 0.15
+  endif
+  if l:t < l:eco.const.ai_build_reserve && l:rate + l:eco.const.tax_step <= l:cap
     let a:world.tax_rates[a:cid] = l:rate + l:eco.const.tax_step
   elseif l:t > l:eco.const.ai_build_reserve * 5.0
         \ && l:rate > l:eco.const.tax_rate
@@ -44,7 +52,6 @@ function! s:decide_build(world, cid) abort
         \ || a:world.treasuries[a:cid] < l:eco.const.ai_build_reserve
     return
   endif
-  let l:map = vimtoria#data#map()
   let l:market = a:world.markets[a:cid]
   " 価格/基準比が最大の財 → それを産出する建物
   let l:best_bid = ''
@@ -64,7 +71,7 @@ function! s:decide_build(world, cid) abort
   " 失業者が最も多い自国州へ
   let l:best_sid = ''
   let l:best_unemp = -1.0
-  for l:sid in l:map.country_states[a:cid]
+  for l:sid in a:world.country_states[a:cid]
     let l:employed = 0.0
     for [l:bid, l:b] in items(a:world.buildings[l:sid])
       let l:employed += l:b.levels * l:b.f * l:eco.const.level_size

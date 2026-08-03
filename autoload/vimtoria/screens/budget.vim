@@ -6,7 +6,8 @@ function! vimtoria#screens#budget#render(st) abort
   let l:map = vimtoria#data#map()
   let l:stats = a:st.world.stats[a:st.country]
   let l:rate = a:st.world.tax_rates[a:st.country]
-  let l:net = l:stats.tax - l:stats.upkeep - l:stats.interest - l:stats.spend
+  let l:net = l:stats.tax - l:stats.upkeep - l:stats.mil
+        \ - l:stats.interest - l:stats.spend
 
   let l:mods = a:st.world.mods[a:st.country]
 
@@ -32,6 +33,8 @@ function! vimtoria#screens#budget#render(st) abort
         \ vimtoria#ui#fmt_num(float2nr(l:stats.tax))))
   call add(l:lines, printf('    政府維持費    -£%s',
         \ vimtoria#ui#fmt_num(float2nr(l:stats.upkeep))))
+  call add(l:lines, printf('    軍事費        -£%s',
+        \ vimtoria#ui#fmt_num(float2nr(l:stats.mil))))
   call add(l:lines, printf('    利払い        -£%s',
         \ vimtoria#ui#fmt_num(float2nr(l:stats.interest))))
   call add(l:lines, printf('    建設支出      -£%s',

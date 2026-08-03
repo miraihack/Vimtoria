@@ -5,17 +5,17 @@ scriptencoding utf-8
 " 進捗 1 ポイントごとに資材(build_goods)を市場価格で国庫から購入する。
 " 国庫が尽きるとその週の建設は停止する。完成で対象州の建物が +1 レベル。
 
-" 建設力 = (base + 国の労働力(千人) / div) × 技術倍率
+" 建設力 = (base + 国の労働力(千人) / div) × 技術倍率 × 法律 × イベント
 function! vimtoria#build#capacity(world, cid) abort
   let l:eco = vimtoria#data#economy()
-  let l:map = vimtoria#data#map()
   let l:workforce = 0.0
-  for l:sid in l:map.country_states[a:cid]
+  for l:sid in a:world.country_states[a:cid]
     let l:workforce += a:world.workforce[l:sid]
   endfor
   return (l:eco.const.build_capacity_base
         \ + l:workforce / l:eco.const.build_capacity_div)
         \ * a:world.mods[a:cid].build_cap
+        \ * a:world.law_mods[a:cid].build_cap
         \ * a:world.event_mods[a:cid].build_cap
 endfunction
 
@@ -33,7 +33,7 @@ endfunction
 function! vimtoria#build#enqueue(state, sid, bid) abort
   let l:eco = vimtoria#data#economy()
   let l:map = vimtoria#data#map()
-  if l:map.states[a:sid].country !=# a:state.country
+  if a:state.world.owner[a:sid] !=# a:state.country
     return l:map.states[a:sid].name . ' は自国領ではありません'
   endif
   let l:queue = a:state.world.queues[a:state.country]

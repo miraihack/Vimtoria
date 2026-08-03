@@ -8,9 +8,13 @@ let g:vimtoria_disable_events = 1
 let g:vimtoria_save_file = 'test/tmp_save.json'
 
 " ---- イベントデータの整合性 ----
+" order はランダム抽選プール。uprising のようにプール外(直接発火専用)の
+" イベントもあるので、order ⊆ events を検証する
 let s:data = vimtoria#data#events()
-call assert_equal(len(s:data.events), len(s:data.order))
-call assert_equal(sort(keys(s:data.events)), sort(copy(s:data.order)))
+call assert_true(len(s:data.events) >= len(s:data.order))
+for s:eid in s:data.order
+  call assert_true(has_key(s:data.events, s:eid), s:eid . ': 抽選プールに未定義イベント')
+endfor
 for [s:eid, s:def] in items(s:data.events)
   call assert_true(has_key(s:def.effects, 'duration'), s:eid)
 endfor

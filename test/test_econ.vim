@@ -66,10 +66,11 @@ endfunction
 " ---- 1 tick ----
 call vimtoria#econ#tick(s:st)
 call s:check_invariants(s:st, '1週目')
-" 国庫の収支が一致する(初期 10000 + 税収 - 維持費 - 利払い - 建設支出)
+" 国庫の収支が一致する(初期 10000 + 税収 - 維持費 - 軍事費 - 利払い - 建設支出)
 let s:jap = s:st.world.stats['JAP']
 call assert_true(abs(s:st.world.treasuries['JAP']
-      \ - (10000.0 + s:jap.tax - s:jap.upkeep - s:jap.interest - s:jap.spend)) < 0.01,
+      \ - (10000.0 + s:jap.tax - s:jap.upkeep - s:jap.mil
+      \    - s:jap.interest - s:jap.spend)) < 0.01,
       \ '国庫の収支が合わない')
 call assert_true(s:jap.tax > 0.0, '税収がない')
 call assert_equal(float2nr(s:st.world.treasuries['JAP']), s:st.treasury,

@@ -57,8 +57,8 @@ function! vimtoria#events#fire(world, cid, eid, day, is_player) abort
           \ a:world.stats[a:cid].income * l:fx.treasury_weeks
   endif
   let l:where = ''
-  if has_key(l:fx, 'workforce_pct')
-    let l:sids = vimtoria#data#map().country_states[a:cid]
+  if has_key(l:fx, 'workforce_pct') && !empty(a:world.country_states[a:cid])
+    let l:sids = a:world.country_states[a:cid]
     let l:sid = l:sids[s:roll(len(l:sids))]
     let a:world.workforce[l:sid] =
           \ a:world.workforce[l:sid] * (1.0 + l:fx.workforce_pct)

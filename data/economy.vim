@@ -28,7 +28,15 @@ let g:vimtoria_data_economy.const = {
       \ 'init_f': 0.8,
       \ 'subsist_income': 2.0,
       \ 'subsist_needs': 0.5,
-      \ 'upkeep_per_k': 4.0,
+      \ 'upkeep_per_k': 3.5,
+      \ 'mil_init_div': 150.0,
+      \ 'mil_cap_div': 50.0,
+      \ 'mil_upkeep_money': 30.0,
+      \ 'mil_recruit_cost': 1000.0,
+      \ 'mil_recruit_batch': 5.0,
+      \ 'mil_tech_bonus': 0.03,
+      \ 'mil_casualty': 0.015,
+      \ 'mil_debt_disband': 0.02,
       \ 'build_capacity_base': 3.0,
       \ 'build_capacity_div': 800.0,
       \ 'build_points': 50.0,
@@ -46,6 +54,11 @@ let g:vimtoria_data_economy.const = {
 " 建設 1 ポイントあたりの資材消費(市場価格で政府が購入)
 let g:vimtoria_data_economy.build_goods = {
       \ 'wood': 4.0, 'tools': 2.0, 'steel': 1.0,
+      \ }
+
+" 連隊 1 個あたりの週次物資需要(軍需 = 市場の需要シンク)
+let g:vimtoria_data_economy.mil_goods = {
+      \ 'grain': 0.4, 'clothes': 0.15, 'tools': 0.05,
       \ }
 
 let g:vimtoria_data_economy.goods_order = [
