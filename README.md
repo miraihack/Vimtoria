@@ -21,6 +21,11 @@ Vimscript のみで動く、Paradox「Victoria 3」風の経済グランドス�
 nvim --cmd "set rtp^=$PWD" +Vimtoria
 ```
 
+世界地図は 200×37 文字の精緻な ASCII 地図(緯度経度の海岸線ポリゴンから
+`tools/gen_map.py` で生成)。フォントを小さくするか横幅 200 桁以上の
+ターミナルで遊ぶのがおすすめ。ゲーム中はマウスが有効になり(終了時に復元)、
+マップの州タグ付近をクリックすると選択、選択中の州を再クリックすると詳細が開く。
+
 プレイヤー国は既定で日本(江戸幕府)。変更する場合は起動前に:
 
 ```vim
@@ -34,6 +39,7 @@ let g:vimtoria_player_country = 'GBR'  " 例: イギリス
 | `Space` | 停止 / 再開(起動時は停止中) |
 | `1`〜`4` | ゲーム速度(1 ティック = ゲーム内 1 週間) |
 | `h j k l` | マップ上で州を選択(建設・技術画面では `j k` がメニュー選択) |
+| マウスクリック | マップ: 州を選択(選択中の州を再クリックで詳細) |
 | `Enter` | マップ: 州の詳細 / 建設画面: キューへ追加 / 技術画面: 研究開始 |
 | `gm` `gb` `gc` `gt` `gp` `gr` | 市場 / 予算 / 建設 / 技術 / Pop / 列強 画面 |
 | `gv` `gd` `ga` | 政治 / 外交 / 軍事 画面 |
@@ -61,7 +67,9 @@ autoload/vimtoria/ui.vim     バッファ管理・描画・キーマップ
 autoload/vimtoria/map.vim    州選択ナビゲーション
 autoload/vimtoria/data.vim   data/ のローダ(州座標の自動計算)
 autoload/vimtoria/screens/   各画面の描画(状態 → 行リストの純関数)
-data/map.vim                 1836年の世界地図・国・州の定義(Mod ポイント)
+data/map.vim                 1836年の国・州の定義(Mod ポイント)
+data/map_ascii.vim           世界地図の ASCII テンプレート(自動生成)
+tools/gen_map.py             地図ジェネレータ(海岸線ポリゴン → ASCII)
 syntax/vimtoria.vim          画面ハイライト
 test/                        ヘッドレステスト
 ```

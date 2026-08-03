@@ -5,6 +5,7 @@ scriptencoding utf-8
 
 let s:bufnr = -1
 let s:match_version = -1
+let s:saved_mouse = v:null
 
 let s:SCREEN_NAMES = {
       \ 'map': '世界地図',
@@ -44,14 +45,25 @@ function! vimtoria#ui#open() abort
   setlocal nonumber norelativenumber nolist nowrap nomodifiable
   setlocal signcolumn=no filetype=vimtoria
   silent! execute 'file vimtoria://game'
+  " マップのクリック選択のためにマウスを有効化(終了時に復元する)
+  let s:saved_mouse = &mouse
+  set mouse=a
   call s:set_keymaps()
   call vimtoria#ui#apply_matches()
   let s:match_version = vimtoria#core#state().world.map_version
   augroup vimtoria_ui
     autocmd! * <buffer>
-    autocmd BufWipeout <buffer> call vimtoria#core#shutdown()
+    autocmd BufWipeout <buffer> call vimtoria#ui#restore_mouse()
+          \ | call vimtoria#core#shutdown()
   augroup END
   call vimtoria#ui#render()
+endfunction
+
+function! vimtoria#ui#restore_mouse() abort
+  if s:saved_mouse isnot v:null
+    let &mouse = s:saved_mouse
+    let s:saved_mouse = v:null
+  endif
 endfunction
 
 function! vimtoria#ui#close() abort
@@ -134,8 +146,9 @@ endfunction
 
 function! s:hint_line(st) abort
   if a:st.screen ==# 'map'
-    return ' Space:停止 1-4:速度 hjkl/Enter:州 gm:市場 gb:予算 gc:建設 gt:技術'
-          \ . ' gv:政治 gd:外交 ga:軍事 gp:Pop gr:列強 S:セーブ L:ロード q:終了'
+    return ' Space:停止 1-4:速度 hjkl/クリック:州を選択(再クリック:詳細) Enter:州'
+          \ . ' gm:市場 gb:予算 gc:建設 gt:技術 gv:政治 gd:外交 ga:軍事'
+          \ . ' gp:Pop gr:列強 S:セーブ L:ロード q:終了'
   elseif a:st.screen ==# 'construction'
     return ' j/k:建物を選択 Enter:キューへ追加 x:末尾を取消 Space:停止/再開 q:マップへ戻る'
   elseif a:st.screen ==# 'budget'
@@ -186,6 +199,11 @@ function! s:set_keymaps() abort
     execute printf('nnoremap <buffer> <silent> <nowait> %s :<C-u>call vimtoria#core#action(%s)<CR>',
           \ l:key, string(l:act))
   endfor
+  " マウス: マップ上のクリックで州を選択
+  nnoremap <buffer> <silent> <LeftMouse> :<C-u>call vimtoria#core#click()<CR>
+  nnoremap <buffer> <silent> <2-LeftMouse> :<C-u>call vimtoria#core#click()<CR>
+  nnoremap <buffer> <silent> <LeftDrag> <Nop>
+  nnoremap <buffer> <silent> <LeftRelease> <Nop>
   " 編集系キーは誤爆防止のため無効化
   for l:key in ['I', 'A', 'o', 'O', 'R', 'c', 'C', 's']
     execute 'nnoremap <buffer> <nowait> ' . l:key . ' <Nop>'

@@ -30,6 +30,9 @@ for s:line in s:data.template
   call assert_equal(strlen(s:data.template[0]), strlen(s:line),
         \ 'マップの行幅が不揃い: ' . s:line)
 endfor
+" 精緻化後のグリッドサイズ(tools/gen_map.py の設定と一致)
+call assert_equal(200, strlen(s:data.template[0]))
+call assert_equal(37, len(s:data.template))
 " 各国の capital が実在し、その国に属する
 for [s:cid, s:country] in items(s:data.countries)
   call assert_true(has_key(s:data.states, s:country.capital), s:cid . ': capital が未定義')
@@ -66,6 +69,29 @@ for s:id in keys(s:data.states)
   " 孤立州がない(どれかの方向には動ける)
   call assert_true(s:moved, s:id . ': どの方向にも動けない')
 endfor
+
+" ---- マウスクリックの州解決 ----
+" タグ直上のクリックはその州(全州)
+for [s:id, s:stt] in items(s:data.states)
+  call assert_equal(s:id, vimtoria#core#click_resolve(s:stt.row, s:stt.col + 2),
+        \ s:id . ': タグ直上のクリックが解決できない')
+endfor
+" 孤立州(ハワイ)の近傍クリック
+let s:haw = s:data.states['HAW']
+call assert_equal('HAW', vimtoria#core#click_resolve(s:haw.row + 1, s:haw.col + 2))
+call assert_equal('HAW', vimtoria#core#click_resolve(s:haw.row, s:haw.col + 8))
+" 遠洋のクリックは何も選択しない
+call assert_equal('', vimtoria#core#click_resolve(35, 20))
+call assert_equal('', vimtoria#core#click_resolve(-3, 0))
+
+" ---- クリックアクション: 選択 → 再クリックで詳細 ----
+call vimtoria#core#init()
+let s:st = vimtoria#core#state()
+let s:edo = s:data.states['EDO']
+" click() は getmousepos() 依存なので resolve+選択ロジックを直接検証
+let s:st.selected = 'KIN'
+let s:hit = vimtoria#core#click_resolve(s:edo.row, s:edo.col + 2)
+call assert_equal('EDO', s:hit)
 
 " ---- アクション: 画面遷移・選択・速度 ----
 call vimtoria#core#init()

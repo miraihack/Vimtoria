@@ -222,6 +222,50 @@ function! vimtoria#core#load() abort
   return 1
 endfunction
 
+" マウスクリック(マップ画面のみ)。クリック位置から州を選択し、
+" 選択中の州をもう一度クリックすると詳細を開く
+function! vimtoria#core#click() abort
+  let l:st = vimtoria#core#state()
+  let l:pos = getmousepos()
+  if l:pos.winid == 0 || l:pos.line <= 0 || l:st.screen !=# 'map'
+    return
+  endif
+  " マップは ヘッダ・ヒント・空行 の 3 行の下(バッファ 4 行目)から始まる
+  let l:sid = vimtoria#core#click_resolve(l:pos.line - 4, l:pos.column - 1)
+  if empty(l:sid)
+    return
+  endif
+  let l:st.msg = ''
+  if l:st.selected ==# l:sid
+    let l:st.screen = 'state'
+    let l:st.screen_arg = l:sid
+  else
+    let l:st.selected = l:sid
+  endif
+  call vimtoria#ui#render()
+endfunction
+
+" マップ座標(テンプレートの行・桁)から州を解決する。
+" タグ直上ならその州、近傍なら最寄りのタグ、遠ければ空文字
+function! vimtoria#core#click_resolve(row, col) abort
+  let l:states = vimtoria#data#map().states
+  for [l:sid, l:stt] in items(l:states)
+    if l:stt.row == a:row && a:col >= l:stt.col && a:col < l:stt.col + 5
+      return l:sid
+    endif
+  endfor
+  let l:best = ''
+  let l:best_score = 19
+  for [l:sid, l:stt] in items(l:states)
+    let l:score = abs(a:col - (l:stt.col + 2)) + 3 * abs(a:row - l:stt.row)
+    if l:score < l:best_score
+      let l:best_score = l:score
+      let l:best = l:sid
+    endif
+  endfor
+  return l:best
+endfunction
+
 " 画面ごとのメニュー項目数(0 ならメニュー無し)
 function! s:menu_len(st) abort
   if a:st.screen ==# 'construction'
