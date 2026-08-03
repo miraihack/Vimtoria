@@ -19,12 +19,26 @@ let g:vimtoria_data_economy.const = {
       \ 'level_size': 10.0,
       \ 'wage_share': 0.7,
       \ 'tax_rate': 0.10,
+      \ 'tax_min': 0.0,
+      \ 'tax_max': 0.30,
+      \ 'tax_step': 0.025,
       \ 'price_range': 0.75,
       \ 'hire_step': 0.02,
       \ 'min_f': 0.05,
       \ 'init_f': 0.8,
       \ 'subsist_income': 2.0,
       \ 'subsist_needs': 0.5,
+      \ 'upkeep_per_k': 4.0,
+      \ 'build_capacity_base': 3.0,
+      \ 'build_capacity_div': 800.0,
+      \ 'build_points': 50.0,
+      \ 'build_queue_max': 20,
+      \ 'build_new_f': 0.5,
+      \ }
+
+" 建設 1 ポイントあたりの資材消費(市場価格で政府が購入)
+let g:vimtoria_data_economy.build_goods = {
+      \ 'wood': 4.0, 'tools': 2.0, 'steel': 1.0,
       \ }
 
 let g:vimtoria_data_economy.goods_order = [

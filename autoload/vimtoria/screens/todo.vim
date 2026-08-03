@@ -3,7 +3,6 @@ scriptencoding utf-8
 " M2 以降で screens/ 配下の個別ファイルに置き換わる。
 
 let s:MILESTONE = {
-      \ 'market': 'M2', 'budget': 'M2', 'construction': 'M2',
       \ 'tech': 'M3', 'pops': 'M3',
       \ }
 

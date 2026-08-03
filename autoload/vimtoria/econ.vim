@@ -42,6 +42,8 @@ function! vimtoria#econ#init(state) abort
       endif
     endfor
   endfor
+  let l:world.queues = {}
+  let l:world.tax_rates = {}
   for l:cid in keys(l:map.countries)
     let l:world.markets[l:cid] = {}
     for l:gid in keys(l:eco.goods)
@@ -49,8 +51,11 @@ function! vimtoria#econ#init(state) abort
             \ {'price': l:eco.goods[l:gid].base, 'buy': 0.0, 'sell': 0.0}
     endfor
     let l:world.treasuries[l:cid] = 10000.0
+    let l:world.queues[l:cid] = []
+    let l:world.tax_rates[l:cid] = l:eco.const.tax_rate
     let l:world.stats[l:cid] = {'gdp': 0.0, 'income': 0.0, 'sol': 0.0,
-          \ 'workforce': 0.0, 'unemployed': 0.0}
+          \ 'workforce': 0.0, 'unemployed': 0.0,
+          \ 'tax': 0.0, 'upkeep': 0.0, 'spend': 0.0}
   endfor
   let a:state.world = l:world
 endfunction
@@ -121,6 +126,8 @@ function! s:tick_country(world, cid) abort
   for [l:gid, l:q] in items(l:eco.needs_owner)
     let l:buy[l:gid] += l:q * l:owners
   endfor
+  " 建設キューの資材需要
+  call vimtoria#build#demand(a:world, a:cid, l:buy)
 
   " --- 2. 価格更新 ---
   for l:gid in keys(l:eco.goods)
@@ -189,9 +196,19 @@ function! s:tick_country(world, cid) abort
     let l:subsist_total += l:unemployed * l:eco.const.subsist_income
   endfor
 
-  " --- 4. 課税と統計 ---
+  " --- 4. 財政(課税 → 政府維持費 → 建設)と統計 ---
+  let l:tax_rate = a:world.tax_rates[a:cid]
   let l:income = l:wages_total + l:div_total + l:subsist_total
-  let a:world.treasuries[a:cid] += l:income * l:eco.const.tax_rate
+  let l:tax = l:income * l:tax_rate
+  let a:world.treasuries[a:cid] += l:tax
+  " 政府維持費(労働力規模に比例)。払えない分は切り捨て(国庫は 0 が下限)
+  let l:upkeep = l:workforce_total * l:eco.const.upkeep_per_k
+  if l:upkeep > a:world.treasuries[a:cid]
+    let l:upkeep = a:world.treasuries[a:cid]
+  endif
+  let a:world.treasuries[a:cid] -= l:upkeep
+  " 建設キューを進める(資材を市場価格で購入)
+  let l:spend = vimtoria#build#progress(a:world, a:cid)
   " 生活水準 = 手取り所得(千人あたり) / 基礎需要バスケット価格
   let l:basket = 0.0
   for [l:gid, l:q] in items(l:eco.needs_base)
@@ -199,7 +216,7 @@ function! s:tick_country(world, cid) abort
   endfor
   let l:sol = 0.0
   if l:workforce_total > 0.0 && l:basket > 0.0
-    let l:sol = l:income * (1.0 - l:eco.const.tax_rate)
+    let l:sol = l:income * (1.0 - l:tax_rate)
           \ / l:workforce_total / l:basket
   endif
   let a:world.stats[a:cid] = {
@@ -208,5 +225,8 @@ function! s:tick_country(world, cid) abort
         \ 'sol': l:sol,
         \ 'workforce': l:workforce_total,
         \ 'unemployed': l:unemployed_total,
+        \ 'tax': l:tax,
+        \ 'upkeep': l:upkeep,
+        \ 'spend': l:spend,
         \ }
 endfunction

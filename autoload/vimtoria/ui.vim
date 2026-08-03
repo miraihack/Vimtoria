@@ -75,6 +75,10 @@ function! vimtoria#ui#build_lines(st) abort
     call extend(l:lines, vimtoria#screens#state#render(a:st))
   elseif a:st.screen ==# 'market'
     call extend(l:lines, vimtoria#screens#market#render(a:st))
+  elseif a:st.screen ==# 'construction'
+    call extend(l:lines, vimtoria#screens#construction#render(a:st))
+  elseif a:st.screen ==# 'budget'
+    call extend(l:lines, vimtoria#screens#budget#render(a:st))
   else
     call extend(l:lines, vimtoria#screens#todo#render(a:st))
   endif
@@ -108,6 +112,10 @@ function! s:hint_line(st) abort
   if a:st.screen ==# 'map'
     return ' Space:停止/再開 1-4:速度 hjkl:州を選択 Enter:州情報'
           \ . ' gm:市場 gb:予算 gc:建設 gt:技術 gp:Pop q:終了'
+  elseif a:st.screen ==# 'construction'
+    return ' j/k:建物を選択 Enter:キューへ追加 x:末尾を取消 Space:停止/再開 q:マップへ戻る'
+  elseif a:st.screen ==# 'budget'
+    return ' +/-:税率を変更 Space:停止/再開 1-4:速度 q:マップへ戻る'
   endif
   return ' Space:停止/再開 1-4:速度 q:マップへ戻る'
 endfunction
@@ -133,6 +141,8 @@ function! s:set_keymaps() abort
         \ 'gm': 'screen_market', 'gb': 'screen_budget',
         \ 'gc': 'screen_construction', 'gt': 'screen_tech',
         \ 'gp': 'screen_pops',
+        \ 'x': 'cancel',
+        \ '+': 'tax_up', '=': 'tax_up', '-': 'tax_down',
         \ 'q': 'back',
         \ }
   for [l:key, l:act] in items(l:maps)

@@ -26,6 +26,8 @@ function! vimtoria#core#init() abort
         \ 'selected': l:data.countries[l:player].capital,
         \ 'country': l:player,
         \ 'treasury': 10000,
+        \ 'menu_idx': 0,
+        \ 'msg': '',
         \ }
   call vimtoria#econ#init(s:state)
 endfunction
@@ -77,6 +79,7 @@ endfunction
 " キー入力はすべてここに集約される
 function! vimtoria#core#action(name) abort
   let l:st = vimtoria#core#state()
+  let l:st.msg = ''
   if a:name ==# 'pause'
     let l:st.paused = !l:st.paused
     call s:timer_restart()
@@ -86,11 +89,42 @@ function! vimtoria#core#action(name) abort
   elseif a:name =~# '^nav_[hjkl]$'
     if l:st.screen ==# 'map'
       let l:st.selected = vimtoria#map#neighbor(l:st.selected, a:name[4:])
+    elseif l:st.screen ==# 'construction'
+      " 建設画面では j/k が建物メニューの選択
+      let l:n = len(vimtoria#data#economy().buildings_order)
+      if a:name ==# 'nav_j' && l:st.menu_idx < l:n - 1
+        let l:st.menu_idx += 1
+      elseif a:name ==# 'nav_k' && l:st.menu_idx > 0
+        let l:st.menu_idx -= 1
+      endif
     endif
   elseif a:name ==# 'open_state'
     if l:st.screen ==# 'map'
       let l:st.screen = 'state'
       let l:st.screen_arg = l:st.selected
+    elseif l:st.screen ==# 'construction'
+      let l:bid = vimtoria#data#economy().buildings_order[l:st.menu_idx]
+      let l:err = vimtoria#build#enqueue(l:st, l:st.selected, l:bid)
+      let l:st.msg = empty(l:err)
+            \ ? vimtoria#data#economy().buildings[l:bid].name . ' をキューに追加しました'
+            \ : l:err
+    endif
+  elseif a:name ==# 'cancel'
+    if l:st.screen ==# 'construction'
+      let l:err = vimtoria#build#cancel_last(l:st)
+      let l:st.msg = empty(l:err) ? '末尾のキュー項目を取り消しました' : l:err
+    endif
+  elseif a:name ==# 'tax_up' || a:name ==# 'tax_down'
+    if l:st.screen ==# 'budget'
+      let l:eco = vimtoria#data#economy()
+      let l:rate = l:st.world.tax_rates[l:st.country]
+      let l:rate += a:name ==# 'tax_up' ? l:eco.const.tax_step : -l:eco.const.tax_step
+      if l:rate > l:eco.const.tax_max
+        let l:rate = l:eco.const.tax_max
+      elseif l:rate < l:eco.const.tax_min
+        let l:rate = l:eco.const.tax_min
+      endif
+      let l:st.world.tax_rates[l:st.country] = l:rate
     endif
   elseif a:name =~# '^screen_'
     let l:st.screen = a:name[7:]
