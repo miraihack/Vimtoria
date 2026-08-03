@@ -9,9 +9,9 @@ let s:st = vimtoria#core#state()
 let s:eco = vimtoria#data#economy()
 
 " ---- 建設力と資材費 ----
-let s:cap = vimtoria#build#capacity('JAP')
+let s:cap = vimtoria#build#capacity(s:st.world, 'JAP')
 call assert_true(s:cap > 3.0, printf('日本の建設力が小さすぎる: %.1f', s:cap))
-call assert_true(vimtoria#build#capacity('ZUL') < s:cap, '小国の建設力が大国以上')
+call assert_true(vimtoria#build#capacity(s:st.world, 'ZUL') < s:cap, '小国の建設力が大国以上')
 let s:unit = vimtoria#build#point_cost(s:st.world.markets['JAP'])
 call assert_true(s:unit > 0.0)
 
@@ -76,16 +76,23 @@ if !has_key(s:st.world.buildings[s:target], 'steel_mill')
   call assert_true(abs(s:st.world.buildings[s:target]['steel_mill'].levels - 1.0) < 0.001)
 endif
 
-" ---- 国庫が空だと建設は止まる(国庫は 0 未満にならない) ----
+" ---- 国債: 無一文でも信用限度まで借金して建設が進む(M3) ----
 call vimtoria#core#init()
 let s:st = vimtoria#core#state()
 let s:st.world.tax_rates['JAP'] = 0.0
 let s:st.world.treasuries['JAP'] = 0.0
 call assert_equal('', vimtoria#build#enqueue(s:st, 'EDO', 'grain_farm'))
 call vimtoria#econ#tick(s:st)
-call assert_true(s:st.world.queues['JAP'][0].done < 0.001,
-      \ '無一文でも建設が進んでしまう')
-call assert_true(s:st.world.treasuries['JAP'] >= 0.0, '国庫が負になった')
+call assert_true(s:st.world.queues['JAP'][0].done > 0.0,
+      \ '信用があるのに建設が進まない')
+call assert_true(s:st.world.treasuries['JAP'] < 0.0, '債務になっていない')
+let s:credit = s:st.world.stats['JAP'].credit
+call assert_true(s:st.world.treasuries['JAP']
+      \ >= -(s:credit + s:st.world.stats['JAP'].upkeep + 100.0),
+      \ '信用限度を大きく超えて借金した')
+" 債務には利払いが発生する
+call vimtoria#econ#tick(s:st)
+call assert_true(s:st.world.stats['JAP'].interest > 0.0, '利払いが計上されていない')
 
 " ---- 税率アクション(予算画面のみ有効) ----
 call vimtoria#core#init()
@@ -142,7 +149,8 @@ while s:i < 1040
   call vimtoria#econ#tick(s:st)
   let s:i += 1
 endwhile
-call assert_true(s:st.world.treasuries['JAP'] >= 0.0, '20年後に国庫が負')
+call assert_true(s:st.world.treasuries['JAP'] >= -s:st.world.stats['JAP'].credit * 2.0,
+      \ '20年後に信用限度を大きく超える債務')
 call assert_true(s:st.world.buildings['EDO']['textile_mill'].levels > 11.0,
       \ printf('20年で織物工場が増えていない: %.1f',
       \        s:st.world.buildings['EDO']['textile_mill'].levels))

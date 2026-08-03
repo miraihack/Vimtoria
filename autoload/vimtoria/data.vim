@@ -5,6 +5,15 @@ scriptencoding utf-8
 let s:root = expand('<sfile>:p:h:h:h')
 let s:map_cache = {}
 let s:economy_cache = {}
+let s:tech_cache = {}
+
+function! vimtoria#data#tech() abort
+  if empty(s:tech_cache)
+    execute 'source' fnameescape(s:root . '/data/tech.vim')
+    let s:tech_cache = g:vimtoria_data_tech
+  endif
+  return s:tech_cache
+endfunction
 
 function! vimtoria#data#map() abort
   if !empty(s:map_cache)

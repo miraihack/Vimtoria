@@ -34,6 +34,13 @@ let g:vimtoria_data_economy.const = {
       \ 'build_points': 50.0,
       \ 'build_queue_max': 20,
       \ 'build_new_f': 0.5,
+      \ 'credit_mult': 0.5,
+      \ 'dm_min': 0.5,
+      \ 'dm_max': 1.5,
+      \ 'rail_coal_per_k': 0.01,
+      \ 'migration_rate': 0.02,
+      \ 'ai_build_reserve': 20000.0,
+      \ 'ai_queue_max': 2,
       \ }
 
 " 建設 1 ポイントあたりの資材消費(市場価格で政府が購入)

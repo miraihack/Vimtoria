@@ -43,7 +43,10 @@ function! s:check_invariants(st, label) abort
             \ printf('%s: %s/%s 価格逸脱 %.2f', a:label, l:cid, l:gid, l:m.price))
     endfor
     call assert_false(isnan(a:st.world.treasuries[l:cid]), a:label . ': 国庫 NaN')
-    call assert_true(a:st.world.treasuries[l:cid] > 0.0, a:label . ': ' . l:cid . ' 国庫非正')
+    " M3: 信用限度(週間所得×0.5)までは債務を許容する
+    call assert_true(a:st.world.treasuries[l:cid]
+          \ > -(a:st.world.stats[l:cid].income * 2.0 + 1000.0),
+          \ a:label . ': ' . l:cid . ' 債務が過大')
   endfor
   for [l:sid, l:bs] in items(a:st.world.buildings)
     for [l:bid, l:b] in items(l:bs)

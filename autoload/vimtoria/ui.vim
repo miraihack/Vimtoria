@@ -79,6 +79,10 @@ function! vimtoria#ui#build_lines(st) abort
     call extend(l:lines, vimtoria#screens#construction#render(a:st))
   elseif a:st.screen ==# 'budget'
     call extend(l:lines, vimtoria#screens#budget#render(a:st))
+  elseif a:st.screen ==# 'tech'
+    call extend(l:lines, vimtoria#screens#tech#render(a:st))
+  elseif a:st.screen ==# 'pops'
+    call extend(l:lines, vimtoria#screens#pops#render(a:st))
   else
     call extend(l:lines, vimtoria#screens#todo#render(a:st))
   endif
@@ -116,6 +120,8 @@ function! s:hint_line(st) abort
     return ' j/k:建物を選択 Enter:キューへ追加 x:末尾を取消 Space:停止/再開 q:マップへ戻る'
   elseif a:st.screen ==# 'budget'
     return ' +/-:税率を変更 Space:停止/再開 1-4:速度 q:マップへ戻る'
+  elseif a:st.screen ==# 'tech'
+    return ' j/k:技術を選択 Enter:研究開始 Space:停止/再開 q:マップへ戻る'
   endif
   return ' Space:停止/再開 1-4:速度 q:マップへ戻る'
 endfunction

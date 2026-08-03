@@ -5,15 +5,17 @@ scriptencoding utf-8
 " 進捗 1 ポイントごとに資材(build_goods)を市場価格で国庫から購入する。
 " 国庫が尽きるとその週の建設は停止する。完成で対象州の建物が +1 レベル。
 
-" 建設力 = base + 国の労働力(千人) / div
-function! vimtoria#build#capacity(cid) abort
+" 建設力 = (base + 国の労働力(千人) / div) × 技術倍率
+function! vimtoria#build#capacity(world, cid) abort
   let l:eco = vimtoria#data#economy()
   let l:map = vimtoria#data#map()
   let l:workforce = 0.0
   for l:sid in l:map.country_states[a:cid]
-    let l:workforce += l:map.states[l:sid].pop * 10.0 * l:eco.const.workforce_rate
+    let l:workforce += a:world.workforce[l:sid]
   endfor
-  return l:eco.const.build_capacity_base + l:workforce / l:eco.const.build_capacity_div
+  return (l:eco.const.build_capacity_base
+        \ + l:workforce / l:eco.const.build_capacity_div)
+        \ * a:world.mods[a:cid].build_cap
 endfunction
 
 " 現在の市場価格での 1 ポイントあたりの費用(£)
@@ -62,15 +64,16 @@ function! vimtoria#build#demand(world, cid, buy) abort
   if l:remaining <= 0.0
     return
   endif
-  let l:cap = vimtoria#build#capacity(a:cid)
+  let l:cap = vimtoria#build#capacity(a:world, a:cid)
   let l:pts = l:remaining < l:cap ? l:remaining : l:cap
   for [l:gid, l:q] in items(l:eco.build_goods)
     let a:buy[l:gid] += l:q * l:pts
   endfor
 endfunction
 
-" キューを進める(価格決定後に呼ぶ)。支出£を返す
-function! vimtoria#build#progress(world, cid) abort
+" キューを進める(価格決定後に呼ぶ)。支出£を返す。
+" credit(信用限度)の分まで国庫を負にしながら進められる
+function! vimtoria#build#progress(world, cid, credit) abort
   let l:eco = vimtoria#data#economy()
   let l:queue = a:world.queues[a:cid]
   if empty(l:queue)
@@ -78,7 +81,8 @@ function! vimtoria#build#progress(world, cid) abort
   endif
   let l:market = a:world.markets[a:cid]
   let l:unit = vimtoria#build#point_cost(l:market)
-  let l:cap = vimtoria#build#capacity(a:cid)
+  let l:cap = vimtoria#build#capacity(a:world, a:cid)
+  let l:avail = a:world.treasuries[a:cid] + a:credit
   let l:spent = 0.0
   while l:cap > 0.001 && !empty(l:queue)
     let l:item = l:queue[0]
@@ -86,15 +90,16 @@ function! vimtoria#build#progress(world, cid) abort
     if l:step > l:cap
       let l:step = l:cap
     endif
-    " 国庫で支払える分まで縮める
-    if l:unit > 0.0 && l:step * l:unit > a:world.treasuries[a:cid]
-      let l:step = a:world.treasuries[a:cid] / l:unit
+    " 信用限度内で支払える分まで縮める
+    if l:unit > 0.0 && l:step * l:unit > l:avail
+      let l:step = l:avail / l:unit
     endif
     if l:step <= 0.001
       break
     endif
     let l:cost = l:step * l:unit
     let a:world.treasuries[a:cid] -= l:cost
+    let l:avail -= l:cost
     let l:spent += l:cost
     let l:item.done += l:step
     let l:cap -= l:step

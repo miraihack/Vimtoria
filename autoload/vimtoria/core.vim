@@ -89,9 +89,11 @@ function! vimtoria#core#action(name) abort
   elseif a:name =~# '^nav_[hjkl]$'
     if l:st.screen ==# 'map'
       let l:st.selected = vimtoria#map#neighbor(l:st.selected, a:name[4:])
-    elseif l:st.screen ==# 'construction'
-      " 建設画面では j/k が建物メニューの選択
-      let l:n = len(vimtoria#data#economy().buildings_order)
+    elseif l:st.screen ==# 'construction' || l:st.screen ==# 'tech'
+      " メニュー画面では j/k が項目選択
+      let l:n = l:st.screen ==# 'construction'
+            \ ? len(vimtoria#data#economy().buildings_order)
+            \ : len(vimtoria#data#tech().order)
       if a:name ==# 'nav_j' && l:st.menu_idx < l:n - 1
         let l:st.menu_idx += 1
       elseif a:name ==# 'nav_k' && l:st.menu_idx > 0
@@ -107,6 +109,13 @@ function! vimtoria#core#action(name) abort
       let l:err = vimtoria#build#enqueue(l:st, l:st.selected, l:bid)
       let l:st.msg = empty(l:err)
             \ ? vimtoria#data#economy().buildings[l:bid].name . ' をキューに追加しました'
+            \ : l:err
+    elseif l:st.screen ==# 'tech'
+      let l:data = vimtoria#data#tech()
+      let l:tid = l:data.order[l:st.menu_idx]
+      let l:err = vimtoria#tech#start(l:st.world, l:st.country, l:tid)
+      let l:st.msg = empty(l:err)
+            \ ? l:data.techs[l:tid].name . ' の研究を開始しました'
             \ : l:err
     endif
   elseif a:name ==# 'cancel'
@@ -129,6 +138,7 @@ function! vimtoria#core#action(name) abort
   elseif a:name =~# '^screen_'
     let l:st.screen = a:name[7:]
     let l:st.screen_arg = ''
+    let l:st.menu_idx = 0
   elseif a:name ==# 'back'
     if l:st.screen ==# 'map'
       call vimtoria#core#quit()

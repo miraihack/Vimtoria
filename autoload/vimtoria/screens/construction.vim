@@ -8,7 +8,7 @@ function! vimtoria#screens#construction#render(st) abort
   let l:stats = a:st.world.stats[a:st.country]
   let l:queue = a:st.world.queues[a:st.country]
   let l:target = l:map.states[a:st.selected]
-  let l:cap = vimtoria#build#capacity(a:st.country)
+  let l:cap = vimtoria#build#capacity(a:st.world, a:st.country)
   let l:unit = vimtoria#build#point_cost(l:market)
 
   let l:lines = []
