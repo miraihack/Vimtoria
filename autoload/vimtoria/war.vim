@@ -29,15 +29,14 @@ function! vimtoria#war#init_world(world) abort
   endfor
 endfunction
 
-" 総戦力 = 連隊数 × (1 + 技術ボーナス)
+" 総戦力 = 連隊数 × 軍事技術倍率 × 政体倍率
 function! vimtoria#war#strength(world, cid) abort
-  let l:eco = vimtoria#data#economy()
   return a:world.military[a:cid].regiments
-        \ * (1.0 + l:eco.const.mil_tech_bonus
-        \        * len(a:world.techs[a:cid].done))
+        \ * a:world.mods[a:cid].mil
+        \ * a:world.law_mods[a:cid].mil
 endfunction
 
-" 連隊の上限(労働力に比例)
+" 連隊の上限(労働力に比例。国民皆兵などの技術で拡大)
 function! vimtoria#war#cap(world, cid) abort
   let l:eco = vimtoria#data#economy()
   let l:workforce = 0.0
@@ -45,6 +44,7 @@ function! vimtoria#war#cap(world, cid) abort
     let l:workforce += a:world.workforce[l:sid]
   endfor
   return l:workforce / l:eco.const.mil_cap_div
+        \ * a:world.mods[a:cid].mil_cap
 endfunction
 
 " 徴募: 費用と労働力(最大州から)を消費する。成功なら空文字

@@ -39,6 +39,22 @@ function! vimtoria#screens#politics#render(st) abort
           \            : (l:att <= -2 ? vimtoria#i18n#t('pl_angry') : '')))
   endfor
   call add(l:lines, '')
+  call add(l:lines, vimtoria#i18n#t('pl_movs'))
+  let l:any_mov = 0
+  for l:mid in l:data.movement_order
+    if has_key(l:pol.movements, l:mid)
+      let l:mdef = l:data.movements[l:mid]
+      call add(l:lines, printf(vimtoria#i18n#t('pl_mov_row'),
+            \ vimtoria#ui#pad(vimtoria#i18n#name(l:mdef), 18),
+            \ l:pol.movements[l:mid],
+            \ vimtoria#i18n#name(l:data.laws[l:mdef.target])))
+      let l:any_mov = 1
+    endif
+  endfor
+  if !l:any_mov
+    call add(l:lines, vimtoria#i18n#t('pl_mov_none'))
+  endif
+  call add(l:lines, '')
   call add(l:lines, vimtoria#i18n#t('pl_laws'))
   let l:i = 0
   for l:lid in l:data.law_order
@@ -54,6 +70,12 @@ function! vimtoria#screens#politics#render(st) abort
     elseif l:pol.enact.law ==# l:lid
       let l:mark = '▶'
       let l:note = vimtoria#i18n#t('pl_enacting')
+    elseif !vimtoria#politics#law_unlocked(a:st.world, a:st.country, l:lid)
+      " 思想(技術)が未研究で制定できない
+      let l:mark = '×'
+      let l:note = vimtoria#i18n#t('tc_req')
+            \ . vimtoria#i18n#name(
+            \     vimtoria#data#tech().techs[l:def.req_tech])
     else
       let l:mark = '○'
       let l:note = printf(vimtoria#i18n#t('pl_support'),

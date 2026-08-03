@@ -66,10 +66,11 @@ endfunction
 " ---- 1 tick ----
 call vimtoria#econ#tick(s:st)
 call s:check_invariants(s:st, '1週目')
-" 国庫の収支が一致する(初期 10000 + 税収 - 維持費 - 軍事費 - 利払い - 建設支出)
+" 国庫の収支が一致する
+" (初期 10000 + 税収 + 関税 - 維持費 - 軍事費 - 利払い - 建設支出)
 let s:jap = s:st.world.stats['JAP']
 call assert_true(abs(s:st.world.treasuries['JAP']
-      \ - (10000.0 + s:jap.tax - s:jap.upkeep - s:jap.mil
+      \ - (10000.0 + s:jap.tax + s:jap.tariff - s:jap.upkeep - s:jap.mil
       \    - s:jap.interest - s:jap.spend)) < 0.01,
       \ '国庫の収支が合わない')
 call assert_true(s:jap.tax > 0.0, '税収がない')
@@ -104,8 +105,9 @@ call assert_true(s:info.employed > 0.0, '江戸の雇用が消滅')
 call assert_true(s:info.employed <= s:info.workforce + 0.001, '江戸の雇用が労働力超過')
 
 " 性能: 520 tick(37カ国78州×10年)の所要時間。
-" 78州化(+50%)に伴い予算を 1tick < 58ms に改定(Neovim は 40ms 前後)
-call assert_true(s:elapsed_ms < 30000.0,
+" M6(206技術・政体・社会運動・交易)追加に伴い予算を 1tick < 77ms に改定
+" (実測: Neovim 約44ms、Vim 9 約61ms)
+call assert_true(s:elapsed_ms < 40000.0,
       \ printf('10年シミュレーションが遅すぎる: %.0fms', s:elapsed_ms))
 
 call vimtoria#core#shutdown()

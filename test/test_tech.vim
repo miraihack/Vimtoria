@@ -63,14 +63,18 @@ call assert_equal('', s:st.world.techs['JAP'].current)
 call assert_true(vimtoria#build#capacity(s:st.world, 'JAP') > s:cap_before * 1.2,
       \ '株式会社の建設力+25%が効いていない')
 
-" ---- 技術画面のアクション ----
+" ---- 技術画面のアクション(メニューは分野別の表示順) ----
 call vimtoria#core#init()
 let s:st = vimtoria#core#state()
+let s:menu = vimtoria#tech#menu_for('JAP')
+call assert_equal(len(s:data.order) - 18, len(s:menu),
+      \ '固有技術のフィルタがおかしい(日本は自国分3つのみ表示)')
 call vimtoria#core#action('screen_tech')
 call assert_equal(0, s:st.menu_idx)
 call vimtoria#core#action('nav_j')
 call vimtoria#core#action('open_state')
-call assert_equal('steam_engine', s:st.world.techs['JAP'].current)
+call assert_equal(s:menu[1], s:st.world.techs['JAP'].current,
+      \ 'メニュー2番目の技術が研究開始されない')
 call vimtoria#core#action('back')
 
 " ---- AI 国: 研究と建設を自動で行う ----

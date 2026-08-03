@@ -9,9 +9,31 @@ function! vimtoria#ai#decide(world, cid, day, player) abort
   call s:decide_research(a:world, a:cid)
   call s:decide_budget(a:world, a:cid)
   call s:decide_build(a:world, a:cid)
+  call s:decide_politics(a:world, a:cid, a:day)
   " 外交判断は重い(全ペア走査)ので 4 週間隔・国ごとに位相をずらして分散
   if (a:day / 7 + char2nr(a:cid[0]) + char2nr(a:cid[2])) % 4 == 0
     call vimtoria#diplo#ai(a:world, a:cid, a:day, a:player)
+  endif
+endfunction
+
+" 政治: 支持の育った社会運動には譲歩して要求法の制定を始める
+" (放置すると急進性が上がり反乱に至るため)
+function! s:decide_politics(world, cid, day) abort
+  let l:pol = a:world.politics[a:cid]
+  if !empty(l:pol.enact.law)
+    return
+  endif
+  let l:data = vimtoria#data#politics()
+  let l:best = ''
+  let l:best_sup = 60.0
+  for [l:mid, l:sup] in items(l:pol.movements)
+    if l:sup > l:best_sup
+      let l:best_sup = l:sup
+      let l:best = l:data.movements[l:mid].target
+    endif
+  endfor
+  if !empty(l:best)
+    call vimtoria#politics#start_enact(a:world, a:cid, l:best)
   endif
 endfunction
 
@@ -37,12 +59,20 @@ function! s:decide_research(world, cid) abort
   if !empty(l:t.current)
     return
   endif
-  for l:tid in vimtoria#data#tech().order
-    if vimtoria#tech#available(a:world, a:cid, l:tid)
-      let l:t.current = l:tid
-      return
+  " 研究可能な技術のうち最も安いもの(固有技術も候補に入る)
+  let l:techs = vimtoria#data#tech().techs
+  let l:best = ''
+  let l:best_cost = 1.0e18
+  for l:tid in vimtoria#tech#list_for(a:cid)
+    if l:techs[l:tid].cost < l:best_cost
+          \ && vimtoria#tech#available(a:world, a:cid, l:tid)
+      let l:best_cost = l:techs[l:tid].cost
+      let l:best = l:tid
     endif
   endfor
+  if !empty(l:best)
+    let l:t.current = l:best
+  endif
 endfunction
 
 function! s:decide_build(world, cid) abort

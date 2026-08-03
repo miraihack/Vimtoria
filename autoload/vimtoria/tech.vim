@@ -17,7 +17,9 @@ endfunction
 
 function! vimtoria#tech#recompute_mods(world, cid) abort
   let l:data = vimtoria#data#tech()
-  let l:mods = {'out': {}, 'build_cap': 1.0, 'research': 1.0,
+  let l:mods = {'out': {}, 'out_all': 1.0, 'build_cap': 1.0, 'research': 1.0,
+        \ 'trade': 1.0, 'mil': 1.0, 'mil_cap': 1.0, 'tariff': 1.0,
+        \ 'tax_eff': 1.0, 'upkeep': 1.0, 'rad': 0.0,
         \ 'interest': 0.05, 'rail': 0}
   for l:tid in keys(a:world.techs[a:cid].done)
     let l:fx = l:data.techs[l:tid].effects
@@ -26,11 +28,15 @@ function! vimtoria#tech#recompute_mods(world, cid) abort
         let l:mods.out[l:bid] = get(l:mods.out, l:bid, 1.0) * l:m
       endfor
     endif
-    if has_key(l:fx, 'build_cap')
-      let l:mods.build_cap = l:mods.build_cap * l:fx.build_cap
-    endif
-    if has_key(l:fx, 'research')
-      let l:mods.research = l:mods.research * l:fx.research
+    " 乗算で積み上がる倍率
+    for l:key in ['out_all', 'build_cap', 'research', 'trade', 'mil',
+          \       'mil_cap', 'tariff', 'tax_eff', 'upkeep']
+      if has_key(l:fx, l:key)
+        let l:mods[l:key] = l:mods[l:key] * l:fx[l:key]
+      endif
+    endfor
+    if has_key(l:fx, 'rad')
+      let l:mods.rad += l:fx.rad
     endif
     if has_key(l:fx, 'interest') && l:fx.interest < l:mods.interest
       let l:mods.interest = l:fx.interest
@@ -42,19 +48,59 @@ function! vimtoria#tech#recompute_mods(world, cid) abort
   let a:world.mods[a:cid] = l:mods
 endfunction
 
+let s:list_cache = {}
+let s:menu_cache = {}
+
+" その国が研究しうる技術 ID のリスト(固有技術は対象国のみ)
+function! vimtoria#tech#list_for(cid) abort
+  if !has_key(s:list_cache, a:cid)
+    let l:data = vimtoria#data#tech()
+    let l:list = []
+    for l:tid in l:data.order
+      let l:def = l:data.techs[l:tid]
+      if !has_key(l:def, 'country') || index(l:def.country, a:cid) >= 0
+        call add(l:list, l:tid)
+      endif
+    endfor
+    let s:list_cache[a:cid] = l:list
+  endif
+  return s:list_cache[a:cid]
+endfunction
+
+" 技術画面のメニュー順(分野ごとにまとめた表示順)
+function! vimtoria#tech#menu_for(cid) abort
+  if !has_key(s:menu_cache, a:cid)
+    let l:data = vimtoria#data#tech()
+    let l:menu = []
+    for l:branch in l:data.branch_order
+      for l:tid in vimtoria#tech#list_for(a:cid)
+        if l:data.techs[l:tid].branch ==# l:branch
+          call add(l:menu, l:tid)
+        endif
+      endfor
+    endfor
+    let s:menu_cache[a:cid] = l:menu
+  endif
+  return s:menu_cache[a:cid]
+endfunction
+
 " 建物の産出倍率
 function! vimtoria#tech#out_mult(world, cid, bid) abort
   return get(a:world.mods[a:cid].out, a:bid, 1.0)
 endfunction
 
-" 研究可能か(未研究かつ前提をすべて満たす)
+" 研究可能か(未研究・前提充足・固有技術は対象国のみ)
 function! vimtoria#tech#available(world, cid, tid) abort
   let l:data = vimtoria#data#tech()
+  let l:def = l:data.techs[a:tid]
+  if has_key(l:def, 'country') && index(l:def.country, a:cid) < 0
+    return 0
+  endif
   let l:t = a:world.techs[a:cid]
   if has_key(l:t.done, a:tid)
     return 0
   endif
-  for l:req in l:data.techs[a:tid].req
+  for l:req in l:def.req
     if !has_key(l:t.done, l:req)
       return 0
     endif
@@ -84,12 +130,14 @@ function! vimtoria#tech#start(world, cid, tid) abort
   return ''
 endfunction
 
-" 週次の研究力(rp/週)。労働力の平方根でスケールする
+" 週次の研究力(rp/週)。労働力の平方根でスケールし、
+" 技術と法律(政体・参政権)の研究倍率がかかる
 function! vimtoria#tech#rate(world, cid, workforce) abort
   let l:c = vimtoria#data#tech().const
   let l:wf = a:workforce > 0.0 ? a:workforce : 0.0
   return (l:c.rp_base + sqrt(l:wf) / l:c.rp_div)
         \ * a:world.mods[a:cid].research
+        \ * a:world.law_mods[a:cid].research
 endfunction
 
 " 週次進行。完了したら効果を再計算する

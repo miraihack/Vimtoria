@@ -11,8 +11,84 @@ function! vimtoria#data#tech() abort
   if empty(s:tech_cache)
     execute 'source' fnameescape(s:root . '/data/tech.vim')
     let s:tech_cache = g:vimtoria_data_tech
+    call s:tech_gen_descs(s:tech_cache)
   endif
   return s:tech_cache
+endfunction
+
+" 技術の説明文(desc/desc_en)を効果辞書から自動生成する。
+" 政体・法律の解禁(politics の req_tech)も逆引きして表記する
+function! s:tech_gen_descs(data) abort
+  let l:eco = vimtoria#data#economy()
+  let l:pol = vimtoria#data#politics()
+  " 技術 → 解禁される法律のリスト
+  let l:unlocks = {}
+  for l:lid in l:pol.law_order
+    let l:ldef = l:pol.laws[l:lid]
+    if has_key(l:ldef, 'req_tech')
+      if !has_key(l:unlocks, l:ldef.req_tech)
+        let l:unlocks[l:ldef.req_tech] = []
+      endif
+      call add(l:unlocks[l:ldef.req_tech], l:lid)
+    endif
+  endfor
+  for [l:tid, l:def] in items(a:data.techs)
+    let l:def.desc = s:fx_desc(l:def.effects, 0, l:eco, l:pol,
+          \ get(l:unlocks, l:tid, []))
+    let l:def.desc_en = s:fx_desc(l:def.effects, 1, l:eco, l:pol,
+          \ get(l:unlocks, l:tid, []))
+  endfor
+endfunction
+
+function! s:pct(mult) abort
+  return printf('%+d%%', float2nr(round((a:mult - 1.0) * 100.0)))
+endfunction
+
+function! s:fx_desc(fx, en, eco, pol, unlocks) abort
+  let l:p = []
+  for l:lid in a:unlocks
+    let l:lname = a:en ? get(a:pol.laws[l:lid], 'name_en', a:pol.laws[l:lid].name)
+          \           : a:pol.laws[l:lid].name
+    call add(l:p, a:en ? 'unlocks "' . l:lname . '"' : '「' . l:lname . '」を解禁')
+  endfor
+  if has_key(a:fx, 'out')
+    for [l:bid, l:m] in items(a:fx.out)
+      let l:bname = a:en ? get(a:eco.buildings[l:bid], 'name_en', a:eco.buildings[l:bid].name)
+            \           : a:eco.buildings[l:bid].name
+      call add(l:p, a:en ? l:bname . ' output ' . s:pct(l:m)
+            \           : l:bname . 'の産出 ' . s:pct(l:m))
+    endfor
+  endif
+  let l:simple = [
+        \ ['out_all',   '全産出 ',       'all output '],
+        \ ['build_cap', '建設力 ',       'construction '],
+        \ ['research',  '研究力 ',       'research '],
+        \ ['trade',     '交易量 ',       'trade '],
+        \ ['mil',       '軍事力 ',       'military '],
+        \ ['mil_cap',   '連隊上限 ',     'regiment cap '],
+        \ ['tariff',    '関税収入 ',     'tariff income '],
+        \ ['tax_eff',   '徴税効率 ',     'tax efficiency '],
+        \ ['upkeep',    '政府維持費 ',   'gov. upkeep '],
+        \ ]
+  for [l:key, l:ja, l:enl] in l:simple
+    if has_key(a:fx, l:key)
+      call add(l:p, (a:en ? l:enl : l:ja) . s:pct(a:fx[l:key]))
+    endif
+  endfor
+  if has_key(a:fx, 'interest')
+    call add(l:p, a:en
+          \ ? printf('debt interest → %g%%/yr', a:fx.interest * 100.0)
+          \ : printf('国債年利 → %g%%', a:fx.interest * 100.0))
+  endif
+  if has_key(a:fx, 'rad')
+    call add(l:p, a:en ? printf('radicalism %+.2f/wk', a:fx.rad)
+          \           : printf('急進性 %+.2f/週', a:fx.rad))
+  endif
+  if get(a:fx, 'rail', 0)
+    call add(l:p, a:en ? 'rail network consumes coal weekly'
+          \           : '鉄道網が石炭を毎週消費')
+  endif
+  return join(l:p, a:en ? ', ' : '、')
 endfunction
 
 let s:events_cache = {}

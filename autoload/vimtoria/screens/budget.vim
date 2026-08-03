@@ -6,7 +6,7 @@ function! vimtoria#screens#budget#render(st) abort
   let l:map = vimtoria#data#map()
   let l:stats = a:st.world.stats[a:st.country]
   let l:rate = a:st.world.tax_rates[a:st.country]
-  let l:net = l:stats.tax - l:stats.upkeep - l:stats.mil
+  let l:net = l:stats.tax + l:stats.tariff - l:stats.upkeep - l:stats.mil
         \ - l:stats.interest - l:stats.spend
 
   let l:mods = a:st.world.mods[a:st.country]
@@ -32,6 +32,8 @@ function! vimtoria#screens#budget#render(st) abort
   call add(l:lines, vimtoria#i18n#t('bg_lastweek'))
   call add(l:lines, printf(vimtoria#i18n#t('bg_row_tax'),
         \ vimtoria#ui#fmt_num(float2nr(l:stats.tax))))
+  call add(l:lines, printf(vimtoria#i18n#t('bg_row_tariff'),
+        \ vimtoria#ui#fmt_num(float2nr(l:stats.tariff))))
   call add(l:lines, printf(vimtoria#i18n#t('bg_row_upkeep'),
         \ vimtoria#ui#fmt_num(float2nr(l:stats.upkeep))))
   call add(l:lines, printf(vimtoria#i18n#t('bg_row_mil'),

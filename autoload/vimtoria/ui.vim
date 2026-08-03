@@ -81,6 +81,18 @@ function! vimtoria#ui#render() abort
   call setbufline(s:bufnr, 1, l:lines)
   silent! call deletebufline(s:bufnr, len(l:lines) + 1, '$')
   call setbufvar(s:bufnr, '&modifiable', 0)
+  " メニュー画面ではカーソルを選択行(> 印)へ移す。技術ツリーのような
+  " 画面より長いリストでも、Vim のスクロールで選択行が常に見える
+  if l:st.screen !=# 'map'
+    let l:i = 0
+    for l:line in l:lines
+      let l:i += 1
+      if l:line =~# '^  > '
+        call win_execute(bufwinid(s:bufnr), 'call cursor(' . l:i . ', 1)')
+        break
+      endif
+    endfor
+  endif
   redraw
 endfunction
 

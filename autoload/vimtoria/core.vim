@@ -159,7 +159,7 @@ function! vimtoria#core#action(name) abort
             \ : l:err
     elseif l:st.screen ==# 'tech'
       let l:data = vimtoria#data#tech()
-      let l:tid = l:data.order[l:st.menu_idx]
+      let l:tid = vimtoria#tech#menu_for(l:st.country)[l:st.menu_idx]
       let l:err = vimtoria#tech#start(l:st.world, l:st.country, l:tid)
       let l:st.msg = empty(l:err)
             \ ? printf(vimtoria#i18n#t('msg_research_started'),
@@ -243,7 +243,7 @@ endfunction
 function! vimtoria#core#save() abort
   let l:st = vimtoria#core#state()
   try
-    call writefile([json_encode({'version': 1, 'state': l:st})], s:save_file())
+    call writefile([json_encode({'version': 2, 'state': l:st})], s:save_file())
     let l:st.msg = printf(vimtoria#i18n#t('msg_saved'), s:save_file())
     return 1
   catch
@@ -265,7 +265,7 @@ function! vimtoria#core#load() abort
     let l:st.msg = printf(vimtoria#i18n#t('msg_load_fail'), v:exception)
     return 0
   endtry
-  if type(l:data) != v:t_dict || get(l:data, 'version', 0) != 1
+  if type(l:data) != v:t_dict || get(l:data, 'version', 0) != 2
         \ || !has_key(l:data, 'state')
     let l:st.msg = vimtoria#i18n#t('msg_bad_save')
     return 0
@@ -313,7 +313,7 @@ function! s:menu_len(st) abort
   if a:st.screen ==# 'construction'
     return len(vimtoria#data#economy().buildings_order)
   elseif a:st.screen ==# 'tech'
-    return len(vimtoria#data#tech().order)
+    return len(vimtoria#tech#menu_for(a:st.country))
   elseif a:st.screen ==# 'politics'
     return len(vimtoria#data#politics().law_order)
   elseif a:st.screen ==# 'diplo'

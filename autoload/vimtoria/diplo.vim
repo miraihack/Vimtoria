@@ -44,6 +44,17 @@ function! vimtoria#diplo#allied(world, a, b) abort
   return has_key(a:world.alliances, vimtoria#diplo#key(a:a, a:b))
 endfunction
 
+" その国がいずれかの戦争に参加しているか(交易の封鎖判定などに使う)
+function! vimtoria#diplo#in_war(world, cid) abort
+  for l:w in a:world.wars
+    if l:w.attacker ==# a:cid || l:w.defender ==# a:cid
+          \ || index(l:w.allies_d, a:cid) >= 0
+      return 1
+    endif
+  endfor
+  return 0
+endfunction
+
 " a と b の間の戦争(どちらの陣営でも)を返す。無ければ {}
 function! vimtoria#diplo#war_between(world, a, b) abort
   for l:w in a:world.wars

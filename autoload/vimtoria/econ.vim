@@ -33,7 +33,8 @@ function! vimtoria#econ#init(state) abort
   let l:eco = vimtoria#data#economy()
   let l:map = vimtoria#data#map()
   let l:world = {'buildings': {}, 'markets': {}, 'stats': {},
-        \ 'treasuries': {}, 'queues': {}, 'tax_rates': {}, 'workforce': {}}
+        \ 'treasuries': {}, 'queues': {}, 'tax_rates': {}, 'workforce': {},
+        \ 'world_prices': {}, 'trade_flows': {}}
   for [l:sid, l:stt] in items(l:map.states)
     let l:workforce = l:stt.pop * 10.0 * l:eco.const.workforce_rate
     let l:world.workforce[l:sid] = l:workforce
@@ -59,7 +60,8 @@ function! vimtoria#econ#init(state) abort
     let l:world.stats[l:cid] = {'gdp': 0.0, 'income': 0.0, 'sol': 1.0,
           \ 'workforce': 0.0, 'unemployed': 0.0,
           \ 'tax': 0.0, 'upkeep': 0.0, 'spend': 0.0,
-          \ 'interest': 0.0, 'credit': 0.0, 'mil': 0.0}
+          \ 'interest': 0.0, 'credit': 0.0, 'mil': 0.0, 'tariff': 0.0}
+    let l:world.trade_flows[l:cid] = {}
   endfor
   " 州の所有権(併合で変わる)
   let l:world.owner = {}
@@ -93,6 +95,8 @@ endfunction
 
 function! vimtoria#econ#tick(state) abort
   let l:map = vimtoria#data#map()
+  " 世界価格(前週の各国価格の単純平均)。各国の交易判断に使う
+  call s:update_world_prices(a:state.world)
   for l:cid in keys(l:map.countries)
     call s:tick_country(a:state.world, l:cid, a:state.country, a:state.day)
   endfor
@@ -100,6 +104,30 @@ function! vimtoria#econ#tick(state) abort
   call vimtoria#war#tick(a:state.world, a:state.day)
   call vimtoria#diplo#tick(a:state.world)
   let a:state.treasury = float2nr(a:state.world.treasuries[a:state.country])
+endfunction
+
+function! s:update_world_prices(world) abort
+  let l:eco = vimtoria#data#economy()
+  let l:wp = {}
+  for l:gid in l:eco.goods_ids
+    let l:wp[l:gid] = 0.0
+  endfor
+  let l:n = 0
+  for [l:cid, l:market] in items(a:world.markets)
+    if empty(a:world.country_states[l:cid])
+      continue
+    endif
+    let l:n += 1
+    for l:gid in l:eco.goods_ids
+      let l:wp[l:gid] += l:market[l:gid].price
+    endfor
+  endfor
+  if l:n > 0
+    for l:gid in l:eco.goods_ids
+      let l:wp[l:gid] = l:wp[l:gid] / l:n
+    endfor
+  endif
+  let a:world.world_prices = l:wp
 endfunction
 
 " 州の労働力・雇用の要約(UI からも使う)
@@ -167,7 +195,8 @@ function! s:tick_country(world, cid, player, day) abort
       let l:bdef = l:bdefs[l:bid]
       let l:eff = l:b.levels * l:b.f
       if !has_key(l:om_cache, l:bid)
-        let l:om_cache[l:bid] = get(l:mods.out, l:bid, 1.0) * l:evm.out_all
+        let l:om_cache[l:bid] = get(l:mods.out, l:bid, 1.0)
+              \ * l:mods.out_all * l:lm.out_all * l:evm.out_all
               \ * get(l:evm.out, l:bid, 1.0) * get(l:lm.out, l:bid, 1.0)
       endif
       let l:om = l:om_cache[l:bid]
@@ -206,6 +235,43 @@ function! s:tick_country(world, cid, player, day) abort
   endfor
   " 建設キューの資材需要
   call vimtoria#build#demand(a:world, a:cid, l:buy)
+
+  " --- 1.5 交易: 前週の自国価格と世界価格の差で輸出入する ---
+  " 割安な財は世界市場へ売られ(輸出 = 買い注文の上乗せ)、割高な財は
+  " 世界市場から入ってくる(輸入 = 売り注文の上乗せ)。流量に関税がかかる。
+  let l:tariff = 0.0
+  let l:flows = {}
+  let l:tr_mult = l:mods.trade * l:lm.trade
+  if vimtoria#diplo#in_war(a:world, a:cid)
+    let l:tr_mult = l:tr_mult * l:eco.const.trade_war_mult
+  endif
+  let l:trate = l:eco.const.trade_rate * l:tr_mult
+  let l:tthresh = l:eco.const.trade_threshold
+  let l:tmax = l:eco.const.trade_maxdiff
+  let l:trf = l:eco.const.tariff_rate * l:mods.tariff
+  for l:gid in l:eco.goods_ids
+    let l:pw = get(a:world.world_prices, l:gid, 0.0)
+    if l:pw <= 0.0
+      continue
+    endif
+    let l:diff = (l:market[l:gid].price - l:pw) / l:pw
+    if l:diff < -l:tthresh && l:sell[l:gid] > 0.0
+      " 輸出
+      let l:d = -l:diff < l:tmax ? -l:diff : l:tmax
+      let l:q = l:sell[l:gid] * l:trate * l:d
+      let l:buy[l:gid] += l:q
+      let l:flows[l:gid] = l:q
+      let l:tariff += l:q * l:market[l:gid].price * l:trf
+    elseif l:diff > l:tthresh && l:buy[l:gid] > 0.0
+      " 輸入
+      let l:d = l:diff < l:tmax ? l:diff : l:tmax
+      let l:q = l:buy[l:gid] * l:trate * l:d
+      let l:sell[l:gid] += l:q
+      let l:flows[l:gid] = -l:q
+      let l:tariff += l:q * l:market[l:gid].price * l:trf
+    endif
+  endfor
+  let a:world.trade_flows[a:cid] = l:flows
 
   " --- 2. 価格更新(price_for のインライン展開。式は同一) ---
   let l:range = l:eco.const.price_range
@@ -310,9 +376,12 @@ function! s:tick_country(world, cid, player, day) abort
         \ + l:subsist_total
   let l:tax_rate = a:world.tax_rates[a:cid]
   let l:income = l:wages_total + l:div_total + l:subsist_total
-  let l:tax = l:income * l:tax_rate
+  " 徴税効率は技術(税務行政など)と政体(無政府主義は半減)で変わる
+  let l:tax = l:income * l:tax_rate * l:mods.tax_eff * l:lm.tax_eff
   let a:world.treasuries[a:cid] += l:tax
-  let l:upkeep = l:workforce_total * l:eco.const.upkeep_per_k
+  " 関税収入(交易フローに比例)
+  let a:world.treasuries[a:cid] += l:tariff
+  let l:upkeep = l:workforce_total * l:eco.const.upkeep_per_k * l:mods.upkeep
   let a:world.treasuries[a:cid] -= l:upkeep
   " 軍事費(払えないほどの債務なら自然減)
   let l:mil_cost = l:regiments * l:eco.const.mil_upkeep_money
@@ -384,5 +453,6 @@ function! s:tick_country(world, cid, player, day) abort
         \ 'interest': l:interest,
         \ 'credit': l:credit,
         \ 'mil': l:mil_cost,
+        \ 'tariff': l:tariff,
         \ }
 endfunction
