@@ -63,6 +63,9 @@ runtimepath に追加して起動する: >
                 'mouse' が a になり、終了時に元の値へ復元される
   <Enter>       カーソルが州名の上ならその州の詳細、それ以外は選択中の
                 州の詳細(w / b / 矢印キー / 検索でカーソルを動かせる)
+  v             各国概況ポップアップの表示/非表示。選択中の州の所有国の
+                政体・GDP・国庫・技術・軍事・対自国関係・交戦状況が
+                州名の脇に表示される(自国・他国を問わない)
   gm gb gc      市場 / 予算 / 建設 画面
   gt gp gr      技術 / Pop / 列強ランキング 画面
   gv gd ga      政治 / 外交 / 軍事 画面
@@ -179,6 +182,10 @@ g:vimtoria_player_country                          *g:vimtoria_player_country*
     例: >
       let g:vimtoria_player_country = 'GBR'
 <
+g:vimtoria_popup                                            *g:vimtoria_popup*
+    0 にすると地図上の各国概況ポップアップを初期状態で隠す(v で切替)。
+    既定: 1
+
 g:vimtoria_save_file                                    *g:vimtoria_save_file*
     セーブファイルのパス。既定: '~/.vimtoria_save.json'
 

@@ -40,6 +40,7 @@ function! vimtoria#ui#open() abort
   augroup vimtoria_ui
     autocmd! * <buffer>
     autocmd BufWipeout <buffer> call vimtoria#ui#restore_mouse()
+          \ | call vimtoria#popup#hide()
           \ | call vimtoria#core#shutdown()
   augroup END
   call vimtoria#ui#render()
@@ -53,6 +54,7 @@ function! vimtoria#ui#restore_mouse() abort
 endfunction
 
 function! vimtoria#ui#close() abort
+  call vimtoria#popup#hide()
   if s:bufnr != -1 && bufexists(s:bufnr)
     execute 'bwipeout!' s:bufnr
   endif
@@ -92,6 +94,12 @@ function! vimtoria#ui#render() abort
         break
       endif
     endfor
+  endif
+  " 世界地図では選択中の州の所有国の概況をポップアップ表示する
+  if l:st.screen ==# 'map'
+    call vimtoria#popup#update(s:bufnr, l:st)
+  else
+    call vimtoria#popup#hide()
   endif
   redraw
 endfunction
@@ -189,6 +197,7 @@ function! s:set_keymaps() abort
         \ 'i': 'dip_improve', 'a': 'dip_alliance',
         \ 'w': 'dip_war', 'p': 'dip_peace',
         \ 'r': 'mil_recruit', 'd': 'mil_disband',
+        \ 'v': 'popup_toggle',
         \ 'S': 'save', 'L': 'load',
         \ 'q': 'back',
         \ '<Esc>': 'to_map',

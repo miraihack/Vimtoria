@@ -68,9 +68,9 @@ let s:T = {
       \ 'hdr_paused': ['❚❚ 停止中', '❚❚ PAUSED'],
       \ 'hdr_speed':  [' 速度%d', ' speed %d'],
       \
-      \ 'hint_map': [' Space:停止 1-4:速度 hjkl/クリック:州選択 Enter:カーソル位置/選択中の州の詳細'
+      \ 'hint_map': [' Space:停止 1-4:速度 hjkl/クリック:州選択 Enter:カーソル位置/選択中の州の詳細 v:各国情報'
       \   . ' gm:市場 gb:予算 gc:建設 gt:技術 gv:政治 gd:外交 ga:軍事 gp:Pop gr:列強 S/L:セーブ/ロード q:終了',
-      \   ' Space:pause 1-4:speed hjkl/click:select Enter:state under cursor (or selected)'
+      \   ' Space:pause 1-4:speed hjkl/click:select Enter:state under cursor v:country info'
       \   . ' gm:market gb:budget gc:build gt:tech gv:politics gd:diplomacy ga:military gp:pops gr:powers S/L:save/load q:quit'],
       \ 'hint_construction': [' j/k:建物を選択 Enter:キューへ追加 x:末尾を取消 Space:停止/再開 q:マップへ戻る',
       \   ' j/k:choose building Enter:add to queue x:cancel last Space:pause q:back to map'],
@@ -321,6 +321,18 @@ let s:T = {
       \                    'Regiment cap reached (it grows with your workforce)'],
       \ 'err_mil_workforce': ['徴募できる労働力がありません', 'No workforce available to recruit from'],
       \ 'err_mil_none':    ['解散できる連隊がありません', 'No regiments to disband'],
+      \
+      \ 'pu_gov':      ['政体 %s ┃ 急進性 %.0f', 'Gov: %s ┃ radicalism %.0f'],
+      \ 'pu_gdp':      ['週間GDP £%s(世界%d位)', 'Weekly GDP £%s (rank %d)'],
+      \ 'pu_treasury': ['国庫 £%s ┃ 生活水準 %.2f', 'Treasury £%s ┃ SoL %.2f'],
+      \ 'pu_workforce': ['労働力 %s千人 ┃ 失業率 %.0f%%', 'Workforce %sk ┃ unemployment %.0f%%'],
+      \ 'pu_tech':     ['技術 %d/%d ┃ 研究中: %s', 'Tech %d/%d ┃ current: %s'],
+      \ 'pu_army':     ['陸軍 %.0f個連隊 ┃ 戦力 %.0f', 'Army %.0f regiments ┃ strength %.0f'],
+      \ 'pu_yours':    ['あなたの国', 'This is your country'],
+      \ 'pu_rel':      ['対自国関係 %+.0f%s', 'Relations with you %+.0f%s'],
+      \ 'pu_ally':     ['(同盟)', ' (allied)'],
+      \ 'pu_atwar_you': ['(交戦中!)', ' (AT WAR with you!)'],
+      \ 'pu_wars':     ['交戦中: %s', 'At war with: %s'],
       \
       \ 'evt_fmt':         ['【%s】%s%s', '[%s] %s%s'],
       \ 'log_law_enacted': ['【法律制定】%s が施行された', '[Law] %s has been enacted'],

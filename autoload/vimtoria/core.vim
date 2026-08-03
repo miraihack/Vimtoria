@@ -208,6 +208,8 @@ function! vimtoria#core#action(name) abort
       endif
       let l:st.world.tax_rates[l:st.country] = l:rate
     endif
+  elseif a:name ==# 'popup_toggle'
+    call vimtoria#popup#toggle()
   elseif a:name ==# 'save'
     call vimtoria#core#save()
   elseif a:name ==# 'load'

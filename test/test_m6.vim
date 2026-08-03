@@ -184,6 +184,20 @@ while s:i < s:n + 5
 endwhile
 call assert_equal(s:n - 1, s:st.menu_idx, 'メニュー末尾で止まらない')
 
+" ---- 各国概況ポップアップの内容(純関数部分) ----
+let s:box = vimtoria#popup#country(s:st, 'GBR')
+call assert_true(len(s:box) >= 8, 'ポップアップの行数が少ない')
+call assert_match('イギリス', s:box[0], 'タイトルに国名がない')
+call assert_match('週間GDP', join(s:box, "\n"))
+call assert_match('政体', join(s:box, "\n"))
+" 枠の幅が揃っている
+let s:w = strdisplaywidth(s:box[0])
+for s:line in s:box
+  call assert_equal(s:w, strdisplaywidth(s:line), 'ポップアップの枠幅が不揃い')
+endfor
+" 自国には関係値の代わりに「あなたの国」
+call assert_match('あなたの国', join(vimtoria#popup#country(s:st, 'JAP'), "\n"))
+
 call vimtoria#core#shutdown()
 
 " ---- 結果出力 ----

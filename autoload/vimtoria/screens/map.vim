@@ -99,6 +99,20 @@ function! vimtoria#screens#map#labels() abort
   return s:labels
 endfunction
 
+" 指定した州のラベル位置 [row, byte_start, byte_end, disp_start, disp_end]。
+" 未配置なら []。概況ポップアップの位置決めに使う
+function! vimtoria#screens#map#label_pos(sid) abort
+  call s:ensure()
+  for [l:r, l:entries] in items(s:labels)
+    for l:e in l:entries
+      if l:e[0] ==# a:sid
+        return [str2nr(l:r), l:e[1], l:e[2], l:e[3], l:e[4]]
+      endif
+    endfor
+  endfor
+  return []
+endfunction
+
 " ラベル直上の判定のみ(カーソル位置の <Enter> 用)。col はバイト位置
 function! vimtoria#screens#map#hit(row, col) abort
   call s:ensure()
