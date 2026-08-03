@@ -27,6 +27,7 @@ function! vimtoria#core#init() abort
         \ 'country': l:player,
         \ 'treasury': 10000,
         \ }
+  call vimtoria#econ#init(s:state)
 endfunction
 
 function! vimtoria#core#state() abort
@@ -48,7 +49,7 @@ endfunction
 " 1ティック = ゲーム内1週間
 function! vimtoria#core#tick() abort
   let s:state.day += 7
-  " M1: ここに週次の経済更新フックが入る
+  call vimtoria#econ#tick(s:state)
   call vimtoria#ui#render()
 endfunction
 

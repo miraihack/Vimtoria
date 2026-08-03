@@ -73,10 +73,22 @@ function! vimtoria#ui#build_lines(st) abort
     call extend(l:lines, vimtoria#screens#map#render(a:st))
   elseif a:st.screen ==# 'state'
     call extend(l:lines, vimtoria#screens#state#render(a:st))
+  elseif a:st.screen ==# 'market'
+    call extend(l:lines, vimtoria#screens#market#render(a:st))
   else
     call extend(l:lines, vimtoria#screens#todo#render(a:st))
   endif
   return l:lines
+endfunction
+
+" 表示幅(全角=2)で右パディング
+function! vimtoria#ui#pad(str, width) abort
+  let l:fill = a:width - strdisplaywidth(a:str)
+  return l:fill > 0 ? a:str . repeat(' ', l:fill) : a:str
+endfunction
+
+function! vimtoria#ui#fmt_num(n) abort
+  return s:fmt_num(a:n)
 endfunction
 
 function! s:header_line(st) abort

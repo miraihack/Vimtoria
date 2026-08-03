@@ -4,6 +4,7 @@ scriptencoding utf-8
 
 let s:root = expand('<sfile>:p:h:h:h')
 let s:map_cache = {}
+let s:economy_cache = {}
 
 function! vimtoria#data#map() abort
   if !empty(s:map_cache)
@@ -12,7 +13,39 @@ function! vimtoria#data#map() abort
   execute 'source' fnameescape(s:root . '/data/map.vim')
   let s:map_cache = g:vimtoria_data_map
   call s:locate_states(s:map_cache)
+  " 国 → 州リストの逆引きを前計算
+  let s:map_cache.country_states = {}
+  for l:cid in keys(s:map_cache.countries)
+    let s:map_cache.country_states[l:cid] = []
+  endfor
+  for [l:sid, l:stt] in items(s:map_cache.states)
+    call add(s:map_cache.country_states[l:stt.country], l:sid)
+  endfor
+  for l:cid in keys(s:map_cache.country_states)
+    call sort(s:map_cache.country_states[l:cid])
+  endfor
   return s:map_cache
+endfunction
+
+function! vimtoria#data#economy() abort
+  if !empty(s:economy_cache)
+    return s:economy_cache
+  endif
+  execute 'source' fnameescape(s:root . '/data/economy.vim')
+  let s:economy_cache = g:vimtoria_data_economy
+  " 1 レベルあたりの労働者/オーナー数を前計算
+  for l:bdef in values(s:economy_cache.buildings)
+    let l:bdef.workers_pl = 0.0
+    let l:bdef.owners_pl = 0.0
+    for [l:prof, l:n] in items(l:bdef.jobs)
+      if s:economy_cache.professions[l:prof].owner
+        let l:bdef.owners_pl += l:n
+      else
+        let l:bdef.workers_pl += l:n
+      endif
+    endfor
+  endfor
+  return s:economy_cache
 endfunction
 
 " マップテンプレート中の {TAG} プレースホルダを走査し、
