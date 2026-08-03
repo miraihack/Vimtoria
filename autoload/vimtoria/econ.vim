@@ -72,6 +72,7 @@ function! vimtoria#econ#init(state) abort
   call vimtoria#econ#rebuild_country_states(l:world)
   call vimtoria#tech#init_world(l:world)
   call vimtoria#events#init_world(l:world)
+  call vimtoria#history#init_world(l:world)
   call vimtoria#politics#init_world(l:world)
   call vimtoria#diplo#init_world(l:world)
   call vimtoria#war#init_world(l:world)
@@ -95,6 +96,8 @@ endfunction
 
 function! vimtoria#econ#tick(state) abort
   let l:map = vimtoria#data#map()
+  " 期日を迎えた歴史イベントを発火させる
+  call vimtoria#history#tick(a:state.world, a:state.day, a:state.country)
   " 世界価格(前週の各国価格の単純平均)。各国の交易判断に使う
   call s:update_world_prices(a:state.world)
   for l:cid in keys(l:map.countries)
@@ -228,10 +231,14 @@ function! s:tick_country(world, cid, player, day) abort
   if l:mods.rail
     let l:buy['coal'] += l:workforce_total * l:eco.const.rail_coal_per_k
   endif
-  " 軍需(連隊の物資消費)
+  " 軍需(連隊・艦隊の物資消費)
   let l:regiments = a:world.military[a:cid].regiments
   for [l:gid, l:q] in l:eco.mil_goods_items
     let l:buy[l:gid] += l:q * l:regiments
+  endfor
+  let l:ships = a:world.military[a:cid].ships
+  for [l:gid, l:q] in l:eco.navy_goods_items
+    let l:buy[l:gid] += l:q * l:ships
   endfor
   " 建設キューの資材需要
   call vimtoria#build#demand(a:world, a:cid, l:buy)
@@ -241,8 +248,10 @@ function! s:tick_country(world, cid, player, day) abort
   " 世界市場から入ってくる(輸入 = 売り注文の上乗せ)。流量に関税がかかる。
   let l:tariff = 0.0
   let l:flows = {}
-  let l:tr_mult = l:mods.trade * l:lm.trade
-  if vimtoria#diplo#in_war(a:world, a:cid)
+  " 鎖国中の国は世界市場と切り離される
+  let l:tr_mult = get(a:world.isolated, a:cid, 0) ? 0.0
+        \ : l:mods.trade * l:lm.trade * l:evm.trade
+  if l:tr_mult > 0.0 && vimtoria#diplo#in_war(a:world, a:cid)
     let l:tr_mult = l:tr_mult * l:eco.const.trade_war_mult
   endif
   let l:trate = l:eco.const.trade_rate * l:tr_mult
@@ -383,8 +392,9 @@ function! s:tick_country(world, cid, player, day) abort
   let a:world.treasuries[a:cid] += l:tariff
   let l:upkeep = l:workforce_total * l:eco.const.upkeep_per_k * l:mods.upkeep
   let a:world.treasuries[a:cid] -= l:upkeep
-  " 軍事費(払えないほどの債務なら自然減)
+  " 軍事費(陸軍+海軍。払えないほどの債務なら自然減)
   let l:mil_cost = l:regiments * l:eco.const.mil_upkeep_money
+        \ + l:ships * l:eco.const.navy_upkeep_money
   let a:world.treasuries[a:cid] -= l:mil_cost
   " 国債: 負の国庫には週割り金利がかかる
   let l:interest = 0.0

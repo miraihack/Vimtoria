@@ -87,25 +87,31 @@ function! vimtoria#events#fire(world, cid, eid, day, is_player) abort
   endif
 endfunction
 
+" 歴史イベントの時限効果を登録する(id は 'h:' 接頭辞で区別する)
+function! vimtoria#events#add_timed(world, cid, id, weeks) abort
+  call add(a:world.events[a:cid], {'id': a:id, 'weeks': a:weeks})
+  call s:recompute(a:world, a:cid)
+endfunction
+
 function! s:recompute(world, cid) abort
   let l:data = vimtoria#data#events()
-  let l:mods = {'out': {}, 'out_all': 1.0, 'research': 1.0, 'build_cap': 1.0}
+  let l:mods = {'out': {}, 'out_all': 1.0, 'research': 1.0,
+        \ 'build_cap': 1.0, 'trade': 1.0}
   for l:e in a:world.events[a:cid]
-    let l:fx = l:data.events[l:e.id].effects
+    " 'h:' 接頭辞は歴史イベント(data/history.vim)の時限効果
+    let l:fx = l:e.id =~# '^h:'
+          \ ? vimtoria#data#history().events[l:e.id[2:]].effects
+          \ : l:data.events[l:e.id].effects
     if has_key(l:fx, 'out')
       for [l:bid, l:m] in items(l:fx.out)
         let l:mods.out[l:bid] = get(l:mods.out, l:bid, 1.0) * l:m
       endfor
     endif
-    if has_key(l:fx, 'out_all')
-      let l:mods.out_all = l:mods.out_all * l:fx.out_all
-    endif
-    if has_key(l:fx, 'research')
-      let l:mods.research = l:mods.research * l:fx.research
-    endif
-    if has_key(l:fx, 'build_cap')
-      let l:mods.build_cap = l:mods.build_cap * l:fx.build_cap
-    endif
+    for l:key in ['out_all', 'research', 'build_cap', 'trade']
+      if has_key(l:fx, l:key)
+        let l:mods[l:key] = l:mods[l:key] * l:fx[l:key]
+      endif
+    endfor
   endfor
   let a:world.event_mods[a:cid] = l:mods
 endfunction

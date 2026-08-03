@@ -50,8 +50,8 @@ let g:vimtoria_data_politics.law_order = [
       \ 'agrarianism', 'industrialism',
       \ 'laissez_faire', 'worker_protection',
       \ 'land_tax', 'income_tax',
-      \ 'despotism', 'absolute_monarchy', 'liberal_democracy',
-      \ 'socialist_state', 'anarchist_commune',
+      \ 'despotism', 'absolute_monarchy', 'constitutional_monarchy',
+      \ 'republic', 'socialist_state', 'anarchist_commune',
       \ 'census_suffrage', 'universal_male_suffrage', 'universal_suffrage',
       \ ]
 
@@ -105,13 +105,21 @@ let g:vimtoria_data_politics.laws = {
       \   'desc_en': 'Military +10%, construction +5%, research -5%, radicalism +0.05/wk',
       \   'effects': {'mil': 1.1, 'build_cap': 1.05, 'research': 0.95, 'rad': 0.05},
       \   'approval': {'landowners': 2, 'industrialists': 0, 'labor': -2}},
-      \ 'liberal_democracy': {
-      \   'group': 'government', 'name': '自由主義', 'name_en': 'Liberal Democracy',
-      \   'desc': '研究力 +15%、交易 +25%、建設力 +5%、軍事力 -5%、急進性 -0.20/週',
-      \   'desc_en': 'Research +15%, trade +25%, construction +5%, military -5%, radicalism -0.20/wk',
-      \   'effects': {'research': 1.15, 'trade': 1.25, 'build_cap': 1.05,
-      \               'mil': 0.95, 'rad': -0.2},
+      \ 'constitutional_monarchy': {
+      \   'group': 'government', 'name': '立憲君主制', 'name_en': 'Constitutional Monarchy',
+      \   'desc': '研究力 +10%、交易 +15%、建設力 +5%、急進性 -0.15/週',
+      \   'desc_en': 'Research +10%, trade +15%, construction +5%, radicalism -0.15/wk',
+      \   'effects': {'research': 1.1, 'trade': 1.15, 'build_cap': 1.05,
+      \               'rad': -0.15},
       \   'req_tech': 'liberal_thought',
+      \   'approval': {'landowners': 0, 'industrialists': 2, 'labor': 1}},
+      \ 'republic': {
+      \   'group': 'government', 'name': '共和制', 'name_en': 'Republic',
+      \   'desc': '研究力 +15%、交易 +20%、建設力 +10%、軍事力 -5%、急進性 -0.25/週',
+      \   'desc_en': 'Research +15%, trade +20%, construction +10%, military -5%, radicalism -0.25/wk',
+      \   'effects': {'research': 1.15, 'trade': 1.2, 'build_cap': 1.1,
+      \               'mil': 0.95, 'rad': -0.25},
+      \   'req_tech': 'republicanism',
       \   'approval': {'landowners': -2, 'industrialists': 2, 'labor': 1}},
       \ 'socialist_state': {
       \   'group': 'government', 'name': '社会主義', 'name_en': 'Socialist State',
@@ -159,7 +167,8 @@ let g:vimtoria_data_politics.movement_order = ['liberal', 'socialist', 'suffrage
 let g:vimtoria_data_politics.movements = {
       \ 'liberal': {
       \   'name': '自由主義運動', 'name_en': 'Liberal Movement',
-      \   'target': 'liberal_democracy', 'req_tech': 'liberal_thought',
+      \   'target': 'constitutional_monarchy', 'req_tech': 'liberal_thought',
+      \   'satisfied_by': ['constitutional_monarchy', 'republic'],
       \   'grow': 'industrial'},
       \ 'socialist': {
       \   'name': '社会主義運動', 'name_en': 'Socialist Movement',
@@ -182,13 +191,13 @@ let g:vimtoria_data_politics.default_laws = {
 
 let g:vimtoria_data_politics.country_laws = {
       \ 'GBR': {'econ_policy': 'industrialism', 'taxation': 'income_tax',
-      \         'government': 'liberal_democracy'},
+      \         'government': 'constitutional_monarchy'},
       \ 'FRA': {'econ_policy': 'industrialism', 'taxation': 'income_tax',
-      \         'government': 'liberal_democracy'},
+      \         'government': 'constitutional_monarchy'},
       \ 'USA': {'econ_policy': 'industrialism', 'taxation': 'income_tax',
-      \         'government': 'liberal_democracy',
+      \         'government': 'republic',
       \         'suffrage': 'universal_male_suffrage'},
-      \ 'TEX': {'government': 'liberal_democracy'},
+      \ 'TEX': {'government': 'republic'},
       \ 'NET': {'econ_policy': 'industrialism', 'taxation': 'income_tax'},
       \ 'PRU': {'econ_policy': 'industrialism'},
       \ 'SWE': {'econ_policy': 'industrialism'},
@@ -207,11 +216,11 @@ let g:vimtoria_data_politics.country_laws = {
       \ 'SOK': {'government': 'despotism'},
       \ 'MAD': {'government': 'despotism'},
       \ 'HAW': {'government': 'despotism'},
-      \ 'MEX': {'government': 'despotism'},
+      \ 'MEX': {'government': 'republic'},
       \ 'ARG': {'government': 'despotism'},
-      \ 'PBC': {'government': 'despotism'},
-      \ 'NGR': {'government': 'despotism'},
-      \ 'VEN': {'government': 'despotism'},
-      \ 'ECU': {'government': 'despotism'},
-      \ 'CHI': {'government': 'despotism'},
+      \ 'PBC': {'government': 'republic'},
+      \ 'NGR': {'government': 'republic'},
+      \ 'VEN': {'government': 'republic'},
+      \ 'ECU': {'government': 'republic'},
+      \ 'CHI': {'government': 'republic'},
       \ }

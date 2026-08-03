@@ -11,6 +11,10 @@ function! vimtoria#ui#screen_name(screen) abort
   return vimtoria#i18n#t('scr_' . a:screen)
 endfunction
 
+function! vimtoria#ui#bufnr() abort
+  return s:bufnr
+endfunction
+
 function! vimtoria#ui#focus_existing() abort
   if s:bufnr == -1 || !bufexists(s:bufnr)
     return 0
@@ -197,6 +201,7 @@ function! s:set_keymaps() abort
         \ 'i': 'dip_improve', 'a': 'dip_alliance',
         \ 'w': 'dip_war', 'p': 'dip_peace',
         \ 'r': 'mil_recruit', 'd': 'mil_disband',
+        \ 'R': 'navy_recruit', 'D': 'navy_disband',
         \ 'v': 'popup_toggle',
         \ 'S': 'save', 'L': 'load',
         \ 'q': 'back',
@@ -211,8 +216,8 @@ function! s:set_keymaps() abort
   nnoremap <buffer> <silent> <2-LeftMouse> :<C-u>call vimtoria#core#click()<CR>
   nnoremap <buffer> <silent> <LeftDrag> <Nop>
   nnoremap <buffer> <silent> <LeftRelease> <Nop>
-  " 編集系キーは誤爆防止のため無効化
-  for l:key in ['I', 'A', 'o', 'O', 'R', 'c', 'C', 's']
+  " 編集系キーは誤爆防止のため無効化(R は海軍徴募に使う)
+  for l:key in ['I', 'A', 'o', 'O', 'c', 'C', 's']
     execute 'nnoremap <buffer> <nowait> ' . l:key . ' <Nop>'
   endfor
 endfunction

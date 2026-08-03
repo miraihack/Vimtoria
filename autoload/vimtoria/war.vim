@@ -24,8 +24,11 @@ function! vimtoria#war#init_world(world) abort
     for l:sid in a:world.country_states[l:cid]
       let l:workforce += a:world.workforce[l:sid]
     endfor
-    let a:world.military[l:cid] =
-          \ {'regiments': l:workforce / l:eco.const.mil_init_div}
+    " 艦隊は労働力の平方根でスケール(人口大国 ≠ 海軍大国)
+    let a:world.military[l:cid] = {
+          \ 'regiments': l:workforce / l:eco.const.mil_init_div,
+          \ 'ships': sqrt(l:workforce) * l:eco.const.navy_init_mult,
+          \ }
   endfor
 endfunction
 
@@ -34,6 +37,75 @@ function! vimtoria#war#strength(world, cid) abort
   return a:world.military[a:cid].regiments
         \ * a:world.mods[a:cid].mil
         \ * a:world.law_mods[a:cid].mil
+endfunction
+
+" 海軍力 = 艦艇数 × 海軍技術倍率 × 政体倍率。渡航上陸の判定に使う
+function! vimtoria#war#navy_strength(world, cid) abort
+  return a:world.military[a:cid].ships
+        \ * a:world.mods[a:cid].navy
+        \ * a:world.law_mods[a:cid].mil
+endfunction
+
+" 艦隊の上限(労働力に比例)
+function! vimtoria#war#navy_cap(world, cid) abort
+  let l:eco = vimtoria#data#economy()
+  let l:workforce = 0.0
+  for l:sid in a:world.country_states[a:cid]
+    let l:workforce += a:world.workforce[l:sid]
+  endfor
+  return l:workforce / l:eco.const.navy_cap_div
+endfunction
+
+" 艦艇の建造。成功なら空文字
+function! vimtoria#war#recruit_ships(world, cid) abort
+  let l:eco = vimtoria#data#economy()
+  let l:n = l:eco.const.navy_recruit_batch
+  let l:mil = a:world.military[a:cid]
+  if l:mil.ships + l:n > vimtoria#war#navy_cap(a:world, a:cid)
+    return vimtoria#i18n#t('err_navy_cap')
+  endif
+  let l:cost = l:n * l:eco.const.navy_recruit_cost
+  if a:world.treasuries[a:cid] < l:cost
+    return printf(vimtoria#i18n#t('err_no_funds'), l:cost)
+  endif
+  let a:world.treasuries[a:cid] -= l:cost
+  let l:mil.ships += l:n
+  return ''
+endfunction
+
+" 艦艇の退役。成功なら空文字
+function! vimtoria#war#disband_ships(world, cid) abort
+  let l:eco = vimtoria#data#economy()
+  let l:n = l:eco.const.navy_recruit_batch
+  let l:mil = a:world.military[a:cid]
+  if l:mil.ships < l:n
+    return vimtoria#i18n#t('err_navy_none')
+  endif
+  let l:mil.ships -= l:n
+  return ''
+endfunction
+
+" 渡航上陸の判定: 目標州の地域に自国州が無ければ「海外」で、
+" 海軍力 max(最低値, 相手海軍×係数) が必要。可能なら空文字を返す
+function! vimtoria#war#invasion_check(world, cid, goal_sid) abort
+  let l:map = vimtoria#data#map()
+  let l:region = l:map.states[a:goal_sid].region
+  for l:sid in a:world.country_states[a:cid]
+    if l:map.states[l:sid].region ==# l:region
+      return ''
+    endif
+  endfor
+  let l:eco = vimtoria#data#economy()
+  let l:def_cid = a:world.owner[a:goal_sid]
+  let l:need = l:eco.const.navy_invade_ratio
+        \ * vimtoria#war#navy_strength(a:world, l:def_cid)
+  if l:need < l:eco.const.navy_min_invade
+    let l:need = l:eco.const.navy_min_invade
+  endif
+  if vimtoria#war#navy_strength(a:world, a:cid) < l:need
+    return printf(vimtoria#i18n#t('err_navy_weak'), l:need)
+  endif
+  return ''
 endfunction
 
 " 連隊の上限(労働力に比例。国民皆兵などの技術で拡大)

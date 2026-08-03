@@ -70,8 +70,21 @@ endfunction
 
 " ---- プレイヤー/AI 共通のアクション(成功なら空文字を返す) ----
 
+" 鎖国中の国は外交(関係改善・同盟)ができない(される側も同じ)
+function! s:isolated_err(world, a, b) abort
+  if get(get(a:world, 'isolated', {}), a:a, 0)
+        \ || get(get(a:world, 'isolated', {}), a:b, 0)
+    return vimtoria#i18n#t('err_isolated')
+  endif
+  return ''
+endfunction
+
 function! vimtoria#diplo#improve(world, cid, other, day) abort
   let l:c = vimtoria#data#diplomacy().const
+  let l:iso = s:isolated_err(a:world, a:cid, a:other)
+  if !empty(l:iso)
+    return l:iso
+  endif
   let l:k = vimtoria#diplo#key(a:cid, a:other)
   if has_key(a:world.diplo_cd, l:k)
         \ && a:day - a:world.diplo_cd[l:k] < l:c.improve_cd_weeks * 7
@@ -93,6 +106,10 @@ function! vimtoria#diplo#toggle_alliance(world, cid, other) abort
     call remove(a:world.alliances, l:k)
     call s:add_relation(a:world, a:cid, a:other, -30.0)
     return ''
+  endif
+  let l:iso = s:isolated_err(a:world, a:cid, a:other)
+  if !empty(l:iso)
+    return l:iso
   endif
   if !empty(vimtoria#diplo#war_between(a:world, a:cid, a:other))
     return vimtoria#i18n#t('err_ally_war')
@@ -117,6 +134,11 @@ function! vimtoria#diplo#declare_war(world, cid, other, goal_sid, day, player) a
   endif
   if empty(a:world.country_states[a:other])
     return vimtoria#i18n#t('err_war_dead')
+  endif
+  " 渡航上陸: 陸続きでない目標には海軍力(制海権)が必要
+  let l:navy_err = vimtoria#war#invasion_check(a:world, a:cid, a:goal_sid)
+  if !empty(l:navy_err)
+    return l:navy_err
   endif
   " 防御側の同盟国が参戦する
   let l:allies = []
@@ -153,6 +175,11 @@ function! vimtoria#diplo#white_peace(world, cid, other, day) abort
 endfunction
 
 " ---- 週次処理 ----
+
+" 関係値を外部(歴史イベント)から動かす公開ラッパ
+function! vimtoria#diplo#add_relation(world, a, b, delta) abort
+  call s:add_relation(a:world, a:a, a:b, a:delta)
+endfunction
 
 " 関係値のドリフト(正は速く、負はゆっくり 0 へ)
 function! vimtoria#diplo#tick(world) abort

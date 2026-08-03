@@ -18,8 +18,8 @@ endfunction
 function! vimtoria#tech#recompute_mods(world, cid) abort
   let l:data = vimtoria#data#tech()
   let l:mods = {'out': {}, 'out_all': 1.0, 'build_cap': 1.0, 'research': 1.0,
-        \ 'trade': 1.0, 'mil': 1.0, 'mil_cap': 1.0, 'tariff': 1.0,
-        \ 'tax_eff': 1.0, 'upkeep': 1.0, 'rad': 0.0,
+        \ 'trade': 1.0, 'mil': 1.0, 'navy': 1.0, 'mil_cap': 1.0,
+        \ 'tariff': 1.0, 'tax_eff': 1.0, 'upkeep': 1.0, 'rad': 0.0,
         \ 'interest': 0.05, 'rail': 0}
   for l:tid in keys(a:world.techs[a:cid].done)
     let l:fx = l:data.techs[l:tid].effects
@@ -29,7 +29,7 @@ function! vimtoria#tech#recompute_mods(world, cid) abort
       endfor
     endif
     " 乗算で積み上がる倍率
-    for l:key in ['out_all', 'build_cap', 'research', 'trade', 'mil',
+    for l:key in ['out_all', 'build_cap', 'research', 'trade', 'mil', 'navy',
           \       'mil_cap', 'tariff', 'tax_eff', 'upkeep']
       if has_key(l:fx, l:key)
         let l:mods[l:key] = l:mods[l:key] * l:fx[l:key]

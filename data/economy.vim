@@ -34,6 +34,13 @@ let g:vimtoria_data_economy.const = {
       \ 'mil_upkeep_money': 30.0,
       \ 'mil_recruit_cost': 1000.0,
       \ 'mil_recruit_batch': 5.0,
+      \ 'navy_init_mult': 0.5,
+      \ 'navy_cap_div': 150.0,
+      \ 'navy_upkeep_money': 50.0,
+      \ 'navy_recruit_cost': 2500.0,
+      \ 'navy_recruit_batch': 2.0,
+      \ 'navy_min_invade': 10.0,
+      \ 'navy_invade_ratio': 0.4,
       \ 'mil_casualty': 0.015,
       \ 'mil_debt_disband': 0.02,
       \ 'build_capacity_base': 3.0,
@@ -63,6 +70,11 @@ let g:vimtoria_data_economy.build_goods = {
 " 連隊 1 個あたりの週次物資需要(軍需 = 市場の需要シンク)
 let g:vimtoria_data_economy.mil_goods = {
       \ 'grain': 0.4, 'clothes': 0.15, 'tools': 0.05,
+      \ }
+
+" 艦艇 1 隻あたりの週次物資需要(海軍需)
+let g:vimtoria_data_economy.navy_goods = {
+      \ 'wood': 0.5, 'coal': 0.3, 'steel': 0.2,
       \ }
 
 let g:vimtoria_data_economy.goods_order = [

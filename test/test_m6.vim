@@ -45,23 +45,28 @@ for [s:mid, s:mdef] in items(s:pd.movements)
   call assert_true(has_key(s:pd.laws, s:mdef.target), s:mid . ': target 未定義')
   call assert_true(has_key(s:td.techs, s:mdef.req_tech), s:mid . ': req_tech 未定義')
 endfor
-" 政体は5種
+" 政体は6種(専制・絶対王政・立憲君主制・共和制・社会主義・無政府主義)
 let s:govs = filter(copy(s:pd.law_order), 's:pd.laws[v:val].group ==# "government"')
-call assert_equal(5, len(s:govs), '政体が5種でない')
+call assert_equal(6, len(s:govs), '政体が6種でない')
 
 " ---- 初期政体と law_mods ----
 call vimtoria#core#init()
 let s:st = vimtoria#core#state()
 let s:world = s:st.world
 call assert_equal('despotism', s:world.politics['JAP'].laws['government'])
-call assert_equal('liberal_democracy', s:world.politics['GBR'].laws['government'])
+call assert_equal('constitutional_monarchy', s:world.politics['GBR'].laws['government'])
+call assert_equal('republic', s:world.politics['USA'].laws['government'])
 call assert_true(abs(s:world.law_mods['JAP'].research - 0.9) < 0.001, '専制の研究-10%')
-call assert_true(abs(s:world.law_mods['GBR'].trade - 1.25) < 0.001, '自由主義の交易+25%')
+call assert_true(abs(s:world.law_mods['GBR'].trade - 1.15) < 0.001, '立憲君主制の交易+15%')
+" 共和制 1.15 × 男子普通選挙 1.05(合衆国は両方持つ)
+call assert_true(abs(s:world.law_mods['USA'].research - 1.15 * 1.05) < 0.001,
+      \ '共和制+男子普通選挙の研究倍率')
 call assert_true(s:world.law_mods['JAP'].rad > 0.0, '専制の急進性ドリフト')
-call assert_true(s:world.law_mods['GBR'].rad < 0.0, '自由主義の急進性ドリフト')
+call assert_true(s:world.law_mods['GBR'].rad < 0.0, '立憲君主制の急進性ドリフト')
 
 " ---- 政体の解禁: 思想の研究が必要 ----
-call assert_notequal('', vimtoria#politics#start_enact(s:world, 'JAP', 'liberal_democracy'))
+call assert_notequal('', vimtoria#politics#start_enact(s:world, 'JAP', 'constitutional_monarchy'))
+call assert_notequal('', vimtoria#politics#start_enact(s:world, 'JAP', 'republic'))
 call assert_notequal('', vimtoria#politics#start_enact(s:world, 'JAP', 'socialist_state'))
 call assert_notequal('', vimtoria#politics#start_enact(s:world, 'JAP', 'anarchist_commune'))
 let s:world.techs['JAP'].done['utopian_socialism'] = 1
@@ -125,20 +130,21 @@ call assert_true(index(vimtoria#tech#menu_for('GBR'), 'pax_britannica') >= 0)
 call assert_true(index(vimtoria#tech#menu_for('JAP'), 'pax_britannica') < 0)
 
 " ---- 交易: 割安な財は輸出され、関税収入が入る ----
+" (日本は鎖国中なので、開国済みのフランスで検証する)
 call vimtoria#core#init()
 let s:st = vimtoria#core#state()
 let s:world = s:st.world
-" 日本の穀物を人為的に割安にする → 輸出が立つ
-let s:world.markets['JAP']['grain'].price = 8.0
+" フランスの穀物を人為的に割安にする → 輸出が立つ
+let s:world.markets['FRA']['grain'].price = 8.0
 call vimtoria#econ#tick(s:st)
 call assert_true(get(s:world.world_prices, 'grain', 0.0) > 10.0, '世界価格が計算されていない')
-call assert_true(get(s:world.trade_flows['JAP'], 'grain', 0.0) > 0.0,
+call assert_true(get(s:world.trade_flows['FRA'], 'grain', 0.0) > 0.0,
       \ '割安な穀物が輸出されていない')
-call assert_true(s:world.stats['JAP'].tariff > 0.0, '関税収入がない')
+call assert_true(s:world.stats['FRA'].tariff > 0.0, '関税収入がない')
 " 割高な財は輸入される
-let s:world.markets['JAP']['tools'].price = 70.0
+let s:world.markets['FRA']['tools'].price = 70.0
 call vimtoria#econ#tick(s:st)
-call assert_true(get(s:world.trade_flows['JAP'], 'tools', 0.0) < 0.0,
+call assert_true(get(s:world.trade_flows['FRA'], 'tools', 0.0) < 0.0,
       \ '割高な工具が輸入されていない')
 " 戦争中は交易が細る
 call assert_false(vimtoria#diplo#in_war(s:world, 'JAP'))

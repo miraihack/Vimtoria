@@ -60,6 +60,10 @@ function! vimtoria#core#start() abort
     let s:state.screen = 'select'
   endif
   call vimtoria#ui#open()
+  " 国が既に決まっている場合は、起動直後にブリーフィングを表示する
+  if s:state.screen ==# 'map'
+    call vimtoria#popup#briefing(vimtoria#ui#bufnr(), s:state)
+  endif
 endfunction
 
 " 1ティック = ゲーム内1週間
@@ -101,6 +105,8 @@ function! vimtoria#core#action(name) abort
         \ && index(s:PICKER_ACTIONS, a:name) < 0
     return
   endif
+  " ブリーフィング表示中なら、どのキーでも閉じる
+  call vimtoria#popup#dismiss_brief()
   let l:st.msg = ''
   if a:name ==# 'pause'
     let l:st.paused = !l:st.paused
@@ -138,6 +144,10 @@ function! vimtoria#core#action(name) abort
       let l:st.menu_idx = 0
       let l:st.msg = printf(vimtoria#i18n#t('msg_play_start'),
             \ vimtoria#i18n#name(l:map.countries[l:cid]))
+      " 描画の後で、その国の置かれている状況をブリーフィング表示する
+      call vimtoria#ui#render()
+      call vimtoria#popup#briefing(vimtoria#ui#bufnr(), l:st)
+      return
     elseif l:st.screen ==# 'map'
       " カーソルが州名ラベルの上ならその州を選択して詳細を開く。
       " それ以外は従来どおり選択中の州の詳細
@@ -186,6 +196,16 @@ function! vimtoria#core#action(name) abort
       let l:st.msg = empty(l:err)
             \ ? vimtoria#i18n#t(a:name ==# 'mil_recruit'
             \                   ? 'msg_recruited' : 'msg_disbanded')
+            \ : l:err
+    endif
+  elseif a:name ==# 'navy_recruit' || a:name ==# 'navy_disband'
+    if l:st.screen ==# 'military'
+      let l:err = a:name ==# 'navy_recruit'
+            \ ? vimtoria#war#recruit_ships(l:st.world, l:st.country)
+            \ : vimtoria#war#disband_ships(l:st.world, l:st.country)
+      let l:st.msg = empty(l:err)
+            \ ? vimtoria#i18n#t(a:name ==# 'navy_recruit'
+            \                   ? 'msg_navy_built' : 'msg_navy_scrapped')
             \ : l:err
     endif
   elseif a:name ==# 'cancel'
@@ -245,7 +265,7 @@ endfunction
 function! vimtoria#core#save() abort
   let l:st = vimtoria#core#state()
   try
-    call writefile([json_encode({'version': 2, 'state': l:st})], s:save_file())
+    call writefile([json_encode({'version': 3, 'state': l:st})], s:save_file())
     let l:st.msg = printf(vimtoria#i18n#t('msg_saved'), s:save_file())
     return 1
   catch
@@ -267,7 +287,7 @@ function! vimtoria#core#load() abort
     let l:st.msg = printf(vimtoria#i18n#t('msg_load_fail'), v:exception)
     return 0
   endtry
-  if type(l:data) != v:t_dict || get(l:data, 'version', 0) != 2
+  if type(l:data) != v:t_dict || get(l:data, 'version', 0) != 3
         \ || !has_key(l:data, 'state')
     let l:st.msg = vimtoria#i18n#t('msg_bad_save')
     return 0

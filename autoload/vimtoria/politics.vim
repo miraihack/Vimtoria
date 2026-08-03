@@ -158,8 +158,10 @@ function! vimtoria#politics#tick(world, cid, income_by_prof, sol, day, is_player
   let l:mov_rad = 0.0
   for l:mid in l:data.movement_order
     let l:mdef = l:data.movements[l:mid]
+    " 要求が満たされたか(自由主義運動は立憲君主制でも共和制でも満足する)
+    let l:cur_law = l:pol.laws[l:data.laws[l:mdef.target].group]
     let l:satisfied =
-          \ l:pol.laws[l:data.laws[l:mdef.target].group] ==# l:mdef.target
+          \ index(get(l:mdef, 'satisfied_by', [l:mdef.target]), l:cur_law) >= 0
     if has_key(l:pol.movements, l:mid)
       if l:satisfied
         call remove(l:pol.movements, l:mid)
@@ -238,9 +240,10 @@ function! s:complete_enact(world, cid, day, is_player) abort
   endfor
   let l:pol.laws[l:def.group] = l:lid
   let l:pol.enact = {'law': '', 'progress': 0.0}
-  " この法律を要求していた社会運動は解散し、急進性が和らぐ
+  " この法律で要求が満たされた社会運動は解散し、急進性が和らぐ
   for [l:mid, l:sup] in items(l:pol.movements)
-    if l:data.movements[l:mid].target ==# l:lid
+    if index(get(l:data.movements[l:mid], 'satisfied_by',
+          \       [l:data.movements[l:mid].target]), l:lid) >= 0
       call remove(l:pol.movements, l:mid)
       let l:pol.rad -= l:data.const.mov_relief
       if l:pol.rad < 0.0

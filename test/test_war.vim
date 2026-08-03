@@ -9,6 +9,8 @@ let g:vimtoria_disable_events = 1
 call vimtoria#core#init()
 let s:st = vimtoria#core#state()
 let s:world = s:st.world
+" このテストは開国後の外交を検証する(鎖国は test_m7 で検証)
+let s:world.isolated = {}
 
 " ---- 外交の初期状態 ----
 call assert_equal(-60.0, vimtoria#diplo#relation(s:world, 'MEX', 'TEX'))

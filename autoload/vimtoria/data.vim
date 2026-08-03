@@ -65,6 +65,7 @@ function! s:fx_desc(fx, en, eco, pol, unlocks) abort
         \ ['research',  '研究力 ',       'research '],
         \ ['trade',     '交易量 ',       'trade '],
         \ ['mil',       '軍事力 ',       'military '],
+        \ ['navy',      '海軍力 ',       'navy '],
         \ ['mil_cap',   '連隊上限 ',     'regiment cap '],
         \ ['tariff',    '関税収入 ',     'tariff income '],
         \ ['tax_eff',   '徴税効率 ',     'tax efficiency '],
@@ -101,6 +102,23 @@ function! vimtoria#data#events() abort
   return s:events_cache
 endfunction
 
+let s:history_cache = {}
+
+function! vimtoria#data#history() abort
+  if empty(s:history_cache)
+    execute 'source' fnameescape(s:root . '/data/history.vim')
+    let s:history_cache = g:vimtoria_data_history
+    " 発生日(ゲーム内通算日)を計算し、日付順に並べる
+    for l:def in values(s:history_cache.events)
+      let l:def.day = (l:def.year - 1836) * 365 + (l:def.month - 1) * 30 + 14
+    endfor
+    let l:events = s:history_cache.events
+    call sort(s:history_cache.order,
+          \ {a, b -> l:events[a].day - l:events[b].day})
+  endif
+  return s:history_cache
+endfunction
+
 let s:politics_cache = {}
 
 function! vimtoria#data#politics() abort
@@ -128,6 +146,15 @@ function! vimtoria#data#map() abort
   execute 'source' fnameescape(s:root . '/data/map.vim')
   let s:map_cache = g:vimtoria_data_map
   call s:locate_states(s:map_cache)
+  " 州の地域を割り当てる(無指定は旧大陸 = afroeurasia)
+  for l:stt in values(s:map_cache.states)
+    let l:stt.region = 'afroeurasia'
+  endfor
+  for [l:region, l:sids] in items(s:map_cache.state_regions)
+    for l:sid in l:sids
+      let s:map_cache.states[l:sid].region = l:region
+    endfor
+  endfor
   " 国 → 州リストの逆引きを前計算
   let s:map_cache.country_states = {}
   for l:cid in keys(s:map_cache.countries)
@@ -171,6 +198,7 @@ function! vimtoria#data#economy() abort
   let s:economy_cache.needs_base_items = items(s:economy_cache.needs_base)
   let s:economy_cache.needs_owner_items = items(s:economy_cache.needs_owner)
   let s:economy_cache.mil_goods_items = items(s:economy_cache.mil_goods)
+  let s:economy_cache.navy_goods_items = items(s:economy_cache.navy_goods)
   let s:economy_cache.goods_ids = keys(s:economy_cache.goods)
   let s:economy_cache.goods_base = {}
   for [l:gid, l:g] in items(s:economy_cache.goods)

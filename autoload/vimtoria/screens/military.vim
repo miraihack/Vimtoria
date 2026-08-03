@@ -19,14 +19,24 @@ function! vimtoria#screens#military#render(st) abort
   call add(l:lines, printf(vimtoria#i18n#t('ml_stats'),
         \ l:mil.regiments, vimtoria#war#cap(l:world, a:st.country),
         \ vimtoria#war#strength(l:world, a:st.country)))
+  call add(l:lines, printf(vimtoria#i18n#t('ml_navy'),
+        \ l:mil.ships, vimtoria#war#navy_cap(l:world, a:st.country),
+        \ vimtoria#war#navy_strength(l:world, a:st.country)))
   call add(l:lines, printf(vimtoria#i18n#t('ml_upkeep'),
-        \ vimtoria#ui#fmt_num(float2nr(l:mil.regiments * l:eco.const.mil_upkeep_money)),
+        \ vimtoria#ui#fmt_num(float2nr(
+        \   l:mil.regiments * l:eco.const.mil_upkeep_money
+        \   + l:mil.ships * l:eco.const.navy_upkeep_money)),
         \ join(l:goods, ' ')))
   call add(l:lines, printf(vimtoria#i18n#t('ml_recruit'),
         \ l:eco.const.mil_recruit_batch,
         \ vimtoria#ui#fmt_num(float2nr(l:eco.const.mil_recruit_batch
         \                              * l:eco.const.mil_recruit_cost)),
         \ l:eco.const.mil_recruit_batch))
+  call add(l:lines, printf(vimtoria#i18n#t('ml_navy_recruit'),
+        \ l:eco.const.navy_recruit_batch,
+        \ vimtoria#ui#fmt_num(float2nr(l:eco.const.navy_recruit_batch
+        \                              * l:eco.const.navy_recruit_cost))))
+  call add(l:lines, vimtoria#i18n#t('ml_navy_note'))
   if !empty(a:st.msg)
     call add(l:lines, '  » ' . a:st.msg)
   endif
