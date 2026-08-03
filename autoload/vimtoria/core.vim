@@ -45,6 +45,10 @@ function! vimtoria#core#start() abort
     return
   endif
   call vimtoria#core#init()
+  " g:vimtoria_player_country 未指定なら国選択画面から始める
+  if !exists('g:vimtoria_player_country')
+    let s:state.screen = 'select'
+  endif
   call vimtoria#ui#open()
 endfunction
 
@@ -79,6 +83,11 @@ endfunction
 " キー入力はすべてここに集約される
 function! vimtoria#core#action(name) abort
   let l:st = vimtoria#core#state()
+  " 国選択画面では選択操作以外を受け付けない(時間も進めない)
+  if l:st.screen ==# 'select'
+        \ && index(['nav_j', 'nav_k', 'open_state', 'back', 'load'], a:name) < 0
+    return
+  endif
   let l:st.msg = ''
   if a:name ==# 'pause'
     let l:st.paused = !l:st.paused
@@ -99,7 +108,18 @@ function! vimtoria#core#action(name) abort
       endif
     endif
   elseif a:name ==# 'open_state'
-    if l:st.screen ==# 'map'
+    if l:st.screen ==# 'select'
+      " プレイする国を決定
+      let l:map = vimtoria#data#map()
+      let l:cid = l:map.country_order[l:st.menu_idx]
+      let l:st.country = l:cid
+      let l:st.selected = l:map.countries[l:cid].capital
+      let l:st.treasury = float2nr(l:st.world.treasuries[l:cid])
+      let l:st.screen = 'map'
+      let l:st.menu_idx = 0
+      let l:st.msg = l:map.countries[l:cid].name
+            \ . ' でプレイ開始(Space で時間が流れる)'
+    elseif l:st.screen ==# 'map'
       let l:st.screen = 'state'
       let l:st.screen_arg = l:st.selected
     elseif l:st.screen ==# 'construction'
@@ -169,12 +189,18 @@ function! vimtoria#core#action(name) abort
     let l:st.screen_arg = ''
     let l:st.menu_idx = 0
   elseif a:name ==# 'back'
-    if l:st.screen ==# 'map'
+    if l:st.screen ==# 'map' || l:st.screen ==# 'select'
       call vimtoria#core#quit()
       return
     endif
     let l:st.screen = 'map'
     let l:st.screen_arg = ''
+  elseif a:name ==# 'to_map'
+    " ESC: どのサブ画面からでも世界地図へ(マップ上では何もしない)
+    if l:st.screen !=# 'map'
+      let l:st.screen = 'map'
+      let l:st.screen_arg = ''
+    endif
   endif
   call vimtoria#ui#render()
 endfunction
@@ -276,6 +302,8 @@ function! s:menu_len(st) abort
     return len(vimtoria#data#politics().law_order)
   elseif a:st.screen ==# 'diplo'
     return len(vimtoria#core#diplo_targets(a:st))
+  elseif a:st.screen ==# 'select'
+    return len(vimtoria#data#map().country_order)
   endif
   return 0
 endfunction

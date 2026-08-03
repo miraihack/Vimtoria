@@ -138,10 +138,17 @@ function! s:tick_country(world, cid, player, day) abort
     let l:dm = l:eco.const.dm_max
   endif
 
+  " ホットループ用に定数と items() をローカルへ(VimL の辞書アクセスは遅い)
+  let l:level_size = l:eco.const.level_size
+  let l:hire_step = l:eco.const.hire_step
+  let l:min_f = l:eco.const.min_f
+  let l:bdefs = l:eco.buildings
+  let l:om_cache = {}
+
   " --- 1. 注文集計 ---
   let l:buy = {}
   let l:sell = {}
-  for l:gid in keys(l:eco.goods)
+  for l:gid in l:eco.goods_ids
     let l:buy[l:gid] = 0.0
     let l:sell[l:gid] = 0.0
   endfor
@@ -149,35 +156,43 @@ function! s:tick_country(world, cid, player, day) abort
   let l:owners = 0.0
   let l:subsist = 0.0
   let l:workforce_total = 0.0
+  let l:state_bitems = {}
+  let l:state_employed = {}
   for l:sid in a:world.country_states[a:cid]
     let l:workforce_total += a:world.workforce[l:sid]
     let l:employed = 0.0
-    for [l:bid, l:b] in items(a:world.buildings[l:sid])
-      let l:bdef = l:eco.buildings[l:bid]
+    let l:bitems = items(a:world.buildings[l:sid])
+    let l:state_bitems[l:sid] = l:bitems
+    for [l:bid, l:b] in l:bitems
+      let l:bdef = l:bdefs[l:bid]
       let l:eff = l:b.levels * l:b.f
-      let l:om = get(l:mods.out, l:bid, 1.0) * l:evm.out_all
-            \ * get(l:evm.out, l:bid, 1.0) * get(l:lm.out, l:bid, 1.0)
-      for [l:gid, l:q] in items(l:bdef.out)
+      if !has_key(l:om_cache, l:bid)
+        let l:om_cache[l:bid] = get(l:mods.out, l:bid, 1.0) * l:evm.out_all
+              \ * get(l:evm.out, l:bid, 1.0) * get(l:lm.out, l:bid, 1.0)
+      endif
+      let l:om = l:om_cache[l:bid]
+      for [l:gid, l:q] in l:bdef.out_items
         let l:sell[l:gid] += l:q * l:om * l:eff
       endfor
-      for [l:gid, l:q] in items(l:bdef['in'])
+      for [l:gid, l:q] in l:bdef.in_items
         let l:buy[l:gid] += l:q * l:eff
       endfor
       let l:workers += l:bdef.workers_pl * l:eff
       let l:owners += l:bdef.owners_pl * l:eff
-      let l:employed += l:eff * l:eco.const.level_size
+      let l:employed += l:eff * l:level_size
     endfor
+    let l:state_employed[l:sid] = l:employed
     let l:unemp = a:world.workforce[l:sid] - l:employed
     if l:unemp > 0.0
       let l:subsist += l:unemp
     endif
   endfor
   " Pop 需要(自給農は必需品の一部だけ市場で購う)
-  for [l:gid, l:q] in items(l:eco.needs_base)
+  for [l:gid, l:q] in l:eco.needs_base_items
     let l:buy[l:gid] += l:q * l:dm * (l:workers + l:owners
           \ + l:subsist * l:eco.const.subsist_needs)
   endfor
-  for [l:gid, l:q] in items(l:eco.needs_owner)
+  for [l:gid, l:q] in l:eco.needs_owner_items
     let l:buy[l:gid] += l:q * l:dm * l:owners
   endfor
   " 鉄道網の石炭消費(研究済みの場合)
@@ -186,19 +201,33 @@ function! s:tick_country(world, cid, player, day) abort
   endif
   " 軍需(連隊の物資消費)
   let l:regiments = a:world.military[a:cid].regiments
-  for [l:gid, l:q] in items(l:eco.mil_goods)
+  for [l:gid, l:q] in l:eco.mil_goods_items
     let l:buy[l:gid] += l:q * l:regiments
   endfor
   " 建設キューの資材需要
   call vimtoria#build#demand(a:world, a:cid, l:buy)
 
-  " --- 2. 価格更新 ---
-  for l:gid in keys(l:eco.goods)
+  " --- 2. 価格更新(price_for のインライン展開。式は同一) ---
+  let l:range = l:eco.const.price_range
+  let l:price = {}
+  for l:gid in l:eco.goods_ids
     let l:m = l:market[l:gid]
-    let l:m.buy = l:buy[l:gid]
-    let l:m.sell = l:sell[l:gid]
-    let l:m.price = vimtoria#econ#price_for(
-          \ l:eco.goods[l:gid].base, l:m.buy, l:m.sell)
+    let l:vb = l:buy[l:gid]
+    let l:vs = l:sell[l:gid]
+    let l:m.buy = l:vb
+    let l:m.sell = l:vs
+    if l:vb <= 0.0 && l:vs <= 0.0
+      let l:m.price = l:eco.goods_base[l:gid]
+    else
+      let l:delta = l:range * (l:vb - l:vs) / (l:vb > l:vs ? l:vb : l:vs)
+      if l:delta > l:range
+        let l:delta = l:range
+      elseif l:delta < -l:range
+        let l:delta = -l:range
+      endif
+      let l:m.price = l:eco.goods_base[l:gid] * (1.0 + l:delta)
+    endif
+    let l:price[l:gid] = l:m.price
   endfor
 
   " --- 3. 建物損益・賃金・雇用調整 ---
@@ -212,27 +241,23 @@ function! s:tick_country(world, cid, player, day) abort
   let l:wage_share = l:lm.wage_share
   let l:income_by_prof = {}
   for l:sid in a:world.country_states[a:cid]
-    let l:workforce = a:world.workforce[l:sid]
-    let l:employed = 0.0
-    for [l:bid, l:b] in items(a:world.buildings[l:sid])
-      let l:employed += l:b.levels * l:b.f * l:eco.const.level_size
-    endfor
-    let l:unemployed = l:workforce - l:employed
+    " 雇用はフェーズ1の集計を再利用(f はまだ変わっていない)
+    let l:unemployed = a:world.workforce[l:sid] - l:state_employed[l:sid]
     if l:unemployed < 0.0
       let l:unemployed = 0.0
     endif
-    for [l:bid, l:b] in items(a:world.buildings[l:sid])
-      let l:bdef = l:eco.buildings[l:bid]
+    let l:unfilled = 0.0
+    for [l:bid, l:b] in l:state_bitems[l:sid]
+      let l:bdef = l:bdefs[l:bid]
       let l:eff = l:b.levels * l:b.f
-      let l:om = get(l:mods.out, l:bid, 1.0) * l:evm.out_all
-            \ * get(l:evm.out, l:bid, 1.0) * get(l:lm.out, l:bid, 1.0)
+      let l:om = l:om_cache[l:bid]
       let l:rev = 0.0
-      for [l:gid, l:q] in items(l:bdef.out)
-        let l:rev += l:q * l:om * l:eff * l:market[l:gid].price
+      for [l:gid, l:q] in l:bdef.out_items
+        let l:rev += l:q * l:om * l:eff * l:price[l:gid]
       endfor
       let l:cost = 0.0
-      for [l:gid, l:q] in items(l:bdef['in'])
-        let l:cost += l:q * l:eff * l:market[l:gid].price
+      for [l:gid, l:q] in l:bdef.in_items
+        let l:cost += l:q * l:eff * l:price[l:gid]
       endfor
       let l:gross = l:rev - l:cost
       let l:b.gross = l:gross
@@ -243,8 +268,8 @@ function! s:tick_country(world, cid, player, day) abort
         let l:wages_total += l:wage_fund
         let l:div_total += l:div_fund
         " 職業別所得(利益集団の勢力計算に使う)
-        for [l:prof, l:n] in items(l:bdef.jobs)
-          if l:eco.professions[l:prof].owner
+        for [l:prof, l:n] in l:bdef.jobs_items
+          if l:bdef.owner_flags[l:prof]
             let l:income_by_prof[l:prof] = get(l:income_by_prof, l:prof, 0.0)
                   \ + l:div_fund * l:n / l:bdef.owners_pl
           else
@@ -255,26 +280,23 @@ function! s:tick_country(world, cid, player, day) abort
       endif
       " 黒字なら雇用を増やし(失業者がいれば)、赤字なら減らす
       if l:gross > 0.0 && l:unemployed > 0.5 && l:b.f < 1.0
-        let l:hired = l:b.levels * l:eco.const.hire_step * l:eco.const.level_size
+        let l:hired = l:b.levels * l:hire_step * l:level_size
         if l:hired > l:unemployed
           let l:hired = l:unemployed
         endif
-        let l:b.f += l:hired / (l:b.levels * l:eco.const.level_size)
+        let l:b.f += l:hired / (l:b.levels * l:level_size)
         if l:b.f > 1.0
           let l:b.f = 1.0
         endif
         let l:unemployed -= l:hired
       elseif l:gross < 0.0
-        let l:b.f -= l:eco.const.hire_step
-        if l:b.f < l:eco.const.min_f
-          let l:b.f = l:eco.const.min_f
+        let l:b.f -= l:hire_step
+        if l:b.f < l:min_f
+          let l:b.f = l:min_f
         endif
       endif
-    endfor
-    " 移動用: 州ごとの失業者と欠員(調整後の f で計算)
-    let l:unfilled = 0.0
-    for [l:bid, l:b] in items(a:world.buildings[l:sid])
-      let l:unfilled += l:b.levels * (1.0 - l:b.f) * l:eco.const.level_size
+      " 移動用の欠員(調整後の f で計算)
+      let l:unfilled += l:b.levels * (1.0 - l:b.f) * l:level_size
     endfor
     let l:state_unemp[l:sid] = l:unemployed
     let l:state_unfilled[l:sid] = l:unfilled

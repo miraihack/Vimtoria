@@ -22,8 +22,8 @@ call assert_equal(14, vimtoria#core#state().day)
 
 " ---- マップデータの整合性 ----
 let s:data = vimtoria#data#map()
-call assert_equal(52, len(s:data.states))
-call assert_equal(34, len(s:data.countries))
+call assert_equal(78, len(s:data.states))
+call assert_equal(37, len(s:data.countries))
 call assert_equal(sort(keys(s:data.countries)), sort(copy(s:data.country_order)))
 " 全行が同じ幅({TAG} は置換後も 5 文字なので生の strlen で検証できる)
 for s:line in s:data.template
@@ -132,6 +132,37 @@ for s:screen in ['map', 'state', 'market', 'budget', 'construction', 'tech', 'po
   " ヘッダに日付が入っている
   call assert_match('1836年', s:lines[0], s:screen)
 endfor
+
+" ---- 国選択画面: 選択操作以外を受け付けず、Enter で国が決まる ----
+call vimtoria#core#init()
+let s:st = vimtoria#core#state()
+let s:st.screen = 'select'
+" 時間・画面遷移はブロックされる
+call vimtoria#core#action('pause')
+call assert_equal(1, s:st.paused, '国選択中に時間が動いた')
+call vimtoria#core#action('screen_market')
+call assert_equal('select', s:st.screen, '国選択中に画面が遷移した')
+" 2番目の国(イギリス)を選択
+call vimtoria#core#action('nav_j')
+call vimtoria#core#action('open_state')
+call assert_equal('GBR', s:st.country, '選択した国になっていない')
+call assert_equal('GBR', s:st.selected, '首都が選択されていない')
+call assert_equal('map', s:st.screen)
+" 国選択画面の描画
+let s:st2 = vimtoria#core#state()
+let s:st2.screen = 'select'
+let s:lines = vimtoria#ui#build_lines(s:st2)
+call assert_true(len(s:lines) > 37, '国選択画面に全国が並んでいない')
+let s:st2.screen = 'map'
+
+" ---- ESC(to_map): サブ画面から地図へ戻る。地図上では何もしない ----
+call vimtoria#core#init()
+let s:st = vimtoria#core#state()
+call vimtoria#core#action('screen_market')
+call vimtoria#core#action('to_map')
+call assert_equal('map', s:st.screen, 'ESCで地図に戻らない')
+call vimtoria#core#action('to_map')
+call assert_equal('map', s:st.screen, '地図上のESCで画面が変わった')
 
 " ---- ポーズ切り替え(タイマー起動→即停止) ----
 call vimtoria#core#init()

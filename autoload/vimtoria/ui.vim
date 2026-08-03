@@ -19,6 +19,7 @@ let s:SCREEN_NAMES = {
       \ 'politics': '政治',
       \ 'diplo': '外交',
       \ 'military': '軍事',
+      \ 'select': '国選択',
       \ }
 
 function! vimtoria#ui#screen_name(screen) abort
@@ -115,6 +116,8 @@ function! vimtoria#ui#build_lines(st) abort
     call extend(l:lines, vimtoria#screens#diplo#render(a:st))
   elseif a:st.screen ==# 'military'
     call extend(l:lines, vimtoria#screens#military#render(a:st))
+  elseif a:st.screen ==# 'select'
+    call extend(l:lines, vimtoria#screens#select#render(a:st))
   else
     call extend(l:lines, vimtoria#screens#todo#render(a:st))
   endif
@@ -161,8 +164,10 @@ function! s:hint_line(st) abort
     return ' j/k:国を選択 i:関係改善 a:同盟/破棄 w:宣戦布告 p:白紙和平 q:マップへ戻る'
   elseif a:st.screen ==# 'military'
     return ' r:徴募(+5連隊) d:解散(-5連隊) Space:停止/再開 q:マップへ戻る'
+  elseif a:st.screen ==# 'select'
+    return ' j/k:国を選択 Enter:この国でプレイ開始 q:終了'
   endif
-  return ' Space:停止/再開 1-4:速度 q:マップへ戻る'
+  return ' Space:停止/再開 1-4:速度 q/Esc:マップへ戻る'
 endfunction
 
 function! s:fmt_num(n) abort
@@ -194,6 +199,7 @@ function! s:set_keymaps() abort
         \ 'r': 'mil_recruit', 'd': 'mil_disband',
         \ 'S': 'save', 'L': 'load',
         \ 'q': 'back',
+        \ '<Esc>': 'to_map',
         \ }
   for [l:key, l:act] in items(l:maps)
     execute printf('nnoremap <buffer> <silent> <nowait> %s :<C-u>call vimtoria#core#action(%s)<CR>',

@@ -29,18 +29,26 @@ endfunction
 
 " 週次処理: 期限切れの除去 → 新規抽選 → モディファイア再計算
 function! vimtoria#events#tick(world, cid, day, is_player) abort
+  let l:active = a:world.events[a:cid]
   let l:changed = 0
-  for l:e in a:world.events[a:cid]
-    let l:e.weeks -= 1
+  if !empty(l:active)
     let l:changed = 1
-  endfor
-  call filter(a:world.events[a:cid], 'v:val.weeks > 0')
-  let l:data = vimtoria#data#events()
+    let l:i = len(l:active) - 1
+    while l:i >= 0
+      let l:active[l:i].weeks -= 1
+      if l:active[l:i].weeks <= 0
+        call remove(l:active, l:i)
+      endif
+      let l:i -= 1
+    endwhile
+  endif
   if !get(g:, 'vimtoria_disable_events', 0)
-        \ && s:roll(1000) < l:data.chance
-    let l:eid = l:data.order[s:roll(len(l:data.order))]
-    call vimtoria#events#fire(a:world, a:cid, l:eid, a:day, a:is_player)
-    let l:changed = 1
+    let l:data = vimtoria#data#events()
+    if s:roll(1000) < l:data.chance
+      let l:eid = l:data.order[s:roll(len(l:data.order))]
+      call vimtoria#events#fire(a:world, a:cid, l:eid, a:day, a:is_player)
+      let l:changed = 1
+    endif
   endif
   if l:changed
     call s:recompute(a:world, a:cid)

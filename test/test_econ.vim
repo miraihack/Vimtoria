@@ -103,8 +103,9 @@ let s:info = vimtoria#econ#state_info(s:st, 'EDO')
 call assert_true(s:info.employed > 0.0, '江戸の雇用が消滅')
 call assert_true(s:info.employed <= s:info.workforce + 0.001, '江戸の雇用が労働力超過')
 
-" 性能: 520 tick(34カ国×10年)の所要時間。目標 1tick < 50ms
-call assert_true(s:elapsed_ms < 26000.0,
+" 性能: 520 tick(37カ国78州×10年)の所要時間。
+" 78州化(+50%)に伴い予算を 1tick < 58ms に改定(Neovim は 40ms 前後)
+call assert_true(s:elapsed_ms < 30000.0,
       \ printf('10年シミュレーションが遅すぎる: %.0fms', s:elapsed_ms))
 
 call vimtoria#core#shutdown()

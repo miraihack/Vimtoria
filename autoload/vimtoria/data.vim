@@ -72,7 +72,8 @@ function! vimtoria#data#economy() abort
   endif
   execute 'source' fnameescape(s:root . '/data/economy.vim')
   let s:economy_cache = g:vimtoria_data_economy
-  " 1 レベルあたりの労働者/オーナー数を前計算
+  " 1 レベルあたりの労働者/オーナー数と、ホットループ用の items() を前計算
+  " (items() は呼ぶたびにリストを確保するので、静的データは一度だけ展開する)
   for l:bdef in values(s:economy_cache.buildings)
     let l:bdef.workers_pl = 0.0
     let l:bdef.owners_pl = 0.0
@@ -83,6 +84,21 @@ function! vimtoria#data#economy() abort
         let l:bdef.workers_pl += l:n
       endif
     endfor
+    let l:bdef.out_items = items(l:bdef.out)
+    let l:bdef.in_items = items(l:bdef['in'])
+    let l:bdef.jobs_items = items(l:bdef.jobs)
+    let l:bdef.owner_flags = {}
+    for l:prof in keys(l:bdef.jobs)
+      let l:bdef.owner_flags[l:prof] = s:economy_cache.professions[l:prof].owner
+    endfor
+  endfor
+  let s:economy_cache.needs_base_items = items(s:economy_cache.needs_base)
+  let s:economy_cache.needs_owner_items = items(s:economy_cache.needs_owner)
+  let s:economy_cache.mil_goods_items = items(s:economy_cache.mil_goods)
+  let s:economy_cache.goods_ids = keys(s:economy_cache.goods)
+  let s:economy_cache.goods_base = {}
+  for [l:gid, l:g] in items(s:economy_cache.goods)
+    let s:economy_cache.goods_base[l:gid] = l:g.base
   endfor
   return s:economy_cache
 endfunction
