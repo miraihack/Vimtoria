@@ -16,6 +16,7 @@ function! vimtoria#build#capacity(world, cid) abort
   return (l:eco.const.build_capacity_base
         \ + l:workforce / l:eco.const.build_capacity_div)
         \ * a:world.mods[a:cid].build_cap
+        \ * a:world.event_mods[a:cid].build_cap
 endfunction
 
 " 現在の市場価格での 1 ポイントあたりの費用(£)

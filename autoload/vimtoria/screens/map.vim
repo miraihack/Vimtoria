@@ -23,6 +23,17 @@ function! vimtoria#screens#map#render(st) abort
   endfor
   call sort(l:tags)
   call add(l:lines, printf('  %s の州: %s', l:country.name, join(l:tags, ' ')))
+  if !empty(a:st.msg)
+    call add(l:lines, '  » ' . a:st.msg)
+  endif
+  " 最近の出来事(直近3件)
+  if !empty(a:st.world.eventlog)
+    call add(l:lines, '')
+    call add(l:lines, '  ── 最近の出来事 ──')
+    for l:e in a:st.world.eventlog[-3:]
+      call add(l:lines, '  ' . l:e)
+    endfor
+  endif
   call add(l:lines, '')
   call add(l:lines, printf('  1836年の世界 — %dカ国 %d州',
         \ len(l:data.countries), len(l:data.states)))

@@ -15,6 +15,16 @@ function! vimtoria#data#tech() abort
   return s:tech_cache
 endfunction
 
+let s:events_cache = {}
+
+function! vimtoria#data#events() abort
+  if empty(s:events_cache)
+    execute 'source' fnameescape(s:root . '/data/events.vim')
+    let s:events_cache = g:vimtoria_data_events
+  endif
+  return s:events_cache
+endfunction
+
 function! vimtoria#data#map() abort
   if !empty(s:map_cache)
     return s:map_cache

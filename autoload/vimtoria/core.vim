@@ -135,6 +135,13 @@ function! vimtoria#core#action(name) abort
       endif
       let l:st.world.tax_rates[l:st.country] = l:rate
     endif
+  elseif a:name ==# 'save'
+    call vimtoria#core#save()
+  elseif a:name ==# 'load'
+    if confirm('セーブデータをロードしますか?(現在の進行は失われます)',
+          \ "&Yes\n&No", 2) == 1
+      call vimtoria#core#load()
+    endif
   elseif a:name =~# '^screen_'
     let l:st.screen = a:name[7:]
     let l:st.screen_arg = ''
@@ -148,6 +155,49 @@ function! vimtoria#core#action(name) abort
     let l:st.screen_arg = ''
   endif
   call vimtoria#ui#render()
+endfunction
+
+function! s:save_file() abort
+  return expand(get(g:, 'vimtoria_save_file', '~/.vimtoria_save.json'))
+endfunction
+
+" JSON でセーブ(ゲーム状態はすべて JSON 安全な型でできている)
+function! vimtoria#core#save() abort
+  let l:st = vimtoria#core#state()
+  try
+    call writefile([json_encode({'version': 1, 'state': l:st})], s:save_file())
+    let l:st.msg = 'セーブしました: ' . s:save_file()
+    return 1
+  catch
+    let l:st.msg = 'セーブに失敗しました: ' . v:exception
+    return 0
+  endtry
+endfunction
+
+function! vimtoria#core#load() abort
+  let l:file = s:save_file()
+  let l:st = vimtoria#core#state()
+  if !filereadable(l:file)
+    let l:st.msg = 'セーブデータがありません: ' . l:file
+    return 0
+  endif
+  try
+    let l:data = json_decode(join(readfile(l:file), ''))
+  catch
+    let l:st.msg = 'セーブデータを読み込めません: ' . v:exception
+    return 0
+  endtry
+  if type(l:data) != v:t_dict || get(l:data, 'version', 0) != 1
+        \ || !has_key(l:data, 'state')
+    let l:st.msg = 'セーブデータの形式が不正です'
+    return 0
+  endif
+  let s:state = l:data.state
+  let s:state.paused = 1
+  let s:state.screen = 'map'
+  let s:state.msg = 'ロードしました(停止中): ' . vimtoria#core#date_str(s:state.day)
+  call s:timer_restart()
+  return 1
 endfunction
 
 function! vimtoria#core#quit() abort

@@ -18,7 +18,7 @@ let g:vimtoria_data_economy.const = {
       \ 'workforce_rate': 0.2,
       \ 'level_size': 10.0,
       \ 'wage_share': 0.7,
-      \ 'tax_rate': 0.10,
+      \ 'tax_rate': 0.075,
       \ 'tax_min': 0.0,
       \ 'tax_max': 0.30,
       \ 'tax_step': 0.025,

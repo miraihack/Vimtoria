@@ -3,6 +3,8 @@ scriptencoding utf-8
 " 実行: test/run.sh(結果は test/results.txt に書かれる)
 
 let v:errors = []
+" 決定性のためランダムイベントを止める
+let g:vimtoria_disable_events = 1
 
 call vimtoria#core#init()
 let s:st = vimtoria#core#state()
@@ -98,13 +100,13 @@ call assert_true(s:st.world.stats['JAP'].interest > 0.0, '利払いが計上さ�
 call vimtoria#core#init()
 let s:st = vimtoria#core#state()
 call vimtoria#core#action('tax_up')
-call assert_equal(0.10, s:st.world.tax_rates['JAP'], 'マップ画面で税率が変わった')
+call assert_equal(0.075, s:st.world.tax_rates['JAP'], 'マップ画面で税率が変わった')
 call vimtoria#core#action('screen_budget')
 call vimtoria#core#action('tax_up')
-call assert_true(abs(s:st.world.tax_rates['JAP'] - 0.125) < 0.0001)
+call assert_true(abs(s:st.world.tax_rates['JAP'] - 0.10) < 0.0001)
 call vimtoria#core#action('tax_down')
 call vimtoria#core#action('tax_down')
-call assert_true(abs(s:st.world.tax_rates['JAP'] - 0.075) < 0.0001)
+call assert_true(abs(s:st.world.tax_rates['JAP'] - 0.05) < 0.0001)
 " 上限・下限でクランプ
 let s:i = 0
 while s:i < 20

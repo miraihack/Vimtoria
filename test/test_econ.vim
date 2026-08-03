@@ -3,6 +3,8 @@ scriptencoding utf-8
 " 実行: test/run.sh(結果は test/results.txt に書かれる)
 
 let v:errors = []
+" 決定性のためランダムイベントを止める
+let g:vimtoria_disable_events = 1
 
 " ---- 価格式 ----
 call assert_equal(20.0, vimtoria#econ#price_for(20.0, 0.0, 0.0))
@@ -64,9 +66,14 @@ endfunction
 " ---- 1 tick ----
 call vimtoria#econ#tick(s:st)
 call s:check_invariants(s:st, '1週目')
-" 課税で国庫が増える(支出は M2 まで無し)
-call assert_true(s:st.world.treasuries['JAP'] > 10000.0, '日本国庫が増えていない')
-call assert_true(s:st.treasury > 10000, 'プレイヤー国庫が同期されていない')
+" 国庫の収支が一致する(初期 10000 + 税収 - 維持費 - 利払い - 建設支出)
+let s:jap = s:st.world.stats['JAP']
+call assert_true(abs(s:st.world.treasuries['JAP']
+      \ - (10000.0 + s:jap.tax - s:jap.upkeep - s:jap.interest - s:jap.spend)) < 0.01,
+      \ '国庫の収支が合わない')
+call assert_true(s:jap.tax > 0.0, '税収がない')
+call assert_equal(float2nr(s:st.world.treasuries['JAP']), s:st.treasury,
+      \ 'プレイヤー国庫が同期されていない')
 " 需要のある財に注文が立っている
 call assert_true(s:st.world.markets['JAP']['grain'].buy > 0.0)
 call assert_true(s:st.world.markets['JAP']['grain'].sell > 0.0)

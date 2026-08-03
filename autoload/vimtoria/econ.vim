@@ -62,13 +62,14 @@ function! vimtoria#econ#init(state) abort
           \ 'interest': 0.0, 'credit': 0.0}
   endfor
   call vimtoria#tech#init_world(l:world)
+  call vimtoria#events#init_world(l:world)
   let a:state.world = l:world
 endfunction
 
 function! vimtoria#econ#tick(state) abort
   let l:map = vimtoria#data#map()
   for l:cid in keys(l:map.countries)
-    call s:tick_country(a:state.world, l:cid, a:state.country)
+    call s:tick_country(a:state.world, l:cid, a:state.country, a:state.day)
   endfor
   let a:state.treasury = float2nr(a:state.world.treasuries[a:state.country])
 endfunction
@@ -86,11 +87,15 @@ function! vimtoria#econ#state_info(state, sid) abort
         \ 'unemployed': l:unemployed > 0.0 ? l:unemployed : 0.0}
 endfunction
 
-function! s:tick_country(world, cid, player) abort
+function! s:tick_country(world, cid, player, day) abort
   let l:eco = vimtoria#data#economy()
   let l:map = vimtoria#data#map()
   let l:market = a:world.markets[a:cid]
   let l:mods = a:world.mods[a:cid]
+
+  " ランダムイベント(期限処理・抽選・倍率再計算)
+  call vimtoria#events#tick(a:world, a:cid, a:day, a:cid ==# a:player)
+  let l:evm = a:world.event_mods[a:cid]
 
   " 需要係数: 前週の生活水準が高いほど消費が増える
   let l:dm = 0.5 + 0.5 * a:world.stats[a:cid].sol
@@ -117,7 +122,8 @@ function! s:tick_country(world, cid, player) abort
     for [l:bid, l:b] in items(a:world.buildings[l:sid])
       let l:bdef = l:eco.buildings[l:bid]
       let l:eff = l:b.levels * l:b.f
-      let l:om = get(l:mods.out, l:bid, 1.0)
+      let l:om = get(l:mods.out, l:bid, 1.0) * l:evm.out_all
+            \ * get(l:evm.out, l:bid, 1.0)
       for [l:gid, l:q] in items(l:bdef.out)
         let l:sell[l:gid] += l:q * l:om * l:eff
       endfor
@@ -178,7 +184,8 @@ function! s:tick_country(world, cid, player) abort
     for [l:bid, l:b] in items(a:world.buildings[l:sid])
       let l:bdef = l:eco.buildings[l:bid]
       let l:eff = l:b.levels * l:b.f
-      let l:om = get(l:mods.out, l:bid, 1.0)
+      let l:om = get(l:mods.out, l:bid, 1.0) * l:evm.out_all
+            \ * get(l:evm.out, l:bid, 1.0)
       let l:rev = 0.0
       for [l:gid, l:q] in items(l:bdef.out)
         let l:rev += l:q * l:om * l:eff * l:market[l:gid].price
@@ -239,9 +246,10 @@ function! s:tick_country(world, cid, player) abort
   " 建設は信用限度(週間所得 × credit_mult)まで借金しながら進められる
   let l:credit = l:income * l:eco.const.credit_mult
   let l:spend = vimtoria#build#progress(a:world, a:cid, l:credit)
-  " 研究
+  " 研究(イベントの研究力倍率込み)
   call vimtoria#tech#tick(a:world, a:cid,
-        \ vimtoria#tech#rate(a:world, a:cid, l:workforce_total))
+        \ vimtoria#tech#rate(a:world, a:cid, l:workforce_total)
+        \ * l:evm.research)
   " AI 国の意思決定
   if a:cid !=# a:player
     call vimtoria#ai#decide(a:world, a:cid)

@@ -3,6 +3,8 @@ scriptencoding utf-8
 " 実行: test/run.sh(結果は test/results.txt に書かれる)
 
 let v:errors = []
+" 決定性のためランダムイベントを止める
+let g:vimtoria_disable_events = 1
 
 " ---- 技術データの整合性 ----
 let s:data = vimtoria#data#tech()

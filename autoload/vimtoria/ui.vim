@@ -13,6 +13,7 @@ let s:SCREEN_NAMES = {
       \ 'construction': '建設',
       \ 'tech': '技術',
       \ 'pops': 'Pop',
+      \ 'ranking': '列強ランキング',
       \ }
 
 function! vimtoria#ui#screen_name(screen) abort
@@ -83,6 +84,8 @@ function! vimtoria#ui#build_lines(st) abort
     call extend(l:lines, vimtoria#screens#tech#render(a:st))
   elseif a:st.screen ==# 'pops'
     call extend(l:lines, vimtoria#screens#pops#render(a:st))
+  elseif a:st.screen ==# 'ranking'
+    call extend(l:lines, vimtoria#screens#ranking#render(a:st))
   else
     call extend(l:lines, vimtoria#screens#todo#render(a:st))
   endif
@@ -114,8 +117,8 @@ endfunction
 
 function! s:hint_line(st) abort
   if a:st.screen ==# 'map'
-    return ' Space:停止/再開 1-4:速度 hjkl:州を選択 Enter:州情報'
-          \ . ' gm:市場 gb:予算 gc:建設 gt:技術 gp:Pop q:終了'
+    return ' Space:停止 1-4:速度 hjkl/Enter:州 gm:市場 gb:予算 gc:建設'
+          \ . ' gt:技術 gp:Pop gr:列強 S:セーブ L:ロード q:終了'
   elseif a:st.screen ==# 'construction'
     return ' j/k:建物を選択 Enter:キューへ追加 x:末尾を取消 Space:停止/再開 q:マップへ戻る'
   elseif a:st.screen ==# 'budget'
@@ -146,9 +149,10 @@ function! s:set_keymaps() abort
         \ '<CR>': 'open_state',
         \ 'gm': 'screen_market', 'gb': 'screen_budget',
         \ 'gc': 'screen_construction', 'gt': 'screen_tech',
-        \ 'gp': 'screen_pops',
+        \ 'gp': 'screen_pops', 'gr': 'screen_ranking',
         \ 'x': 'cancel',
         \ '+': 'tax_up', '=': 'tax_up', '-': 'tax_down',
+        \ 'S': 'save', 'L': 'load',
         \ 'q': 'back',
         \ }
   for [l:key, l:act] in items(l:maps)
@@ -156,7 +160,7 @@ function! s:set_keymaps() abort
           \ l:key, string(l:act))
   endfor
   " 編集系キーは誤爆防止のため無効化
-  for l:key in ['i', 'I', 'a', 'A', 'o', 'O', 'R', 'c', 'C', 's', 'S']
+  for l:key in ['i', 'I', 'a', 'A', 'o', 'O', 'R', 'c', 'C', 's']
     execute 'nnoremap <buffer> <nowait> ' . l:key . ' <Nop>'
   endfor
 endfunction

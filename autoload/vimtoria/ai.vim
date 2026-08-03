@@ -7,7 +7,21 @@ scriptencoding utf-8
 
 function! vimtoria#ai#decide(world, cid) abort
   call s:decide_research(a:world, a:cid)
+  call s:decide_budget(a:world, a:cid)
   call s:decide_build(a:world, a:cid)
+endfunction
+
+" 財政: 国庫が細れば増税(上限15%)、潤えば減税して生活水準を戻す
+function! s:decide_budget(world, cid) abort
+  let l:eco = vimtoria#data#economy()
+  let l:t = a:world.treasuries[a:cid]
+  let l:rate = a:world.tax_rates[a:cid]
+  if l:t < l:eco.const.ai_build_reserve && l:rate < 0.15
+    let a:world.tax_rates[a:cid] = l:rate + l:eco.const.tax_step
+  elseif l:t > l:eco.const.ai_build_reserve * 5.0
+        \ && l:rate > l:eco.const.tax_rate
+    let a:world.tax_rates[a:cid] = l:rate - l:eco.const.tax_step
+  endif
 endfunction
 
 function! s:decide_research(world, cid) abort
