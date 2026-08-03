@@ -34,11 +34,12 @@ function! vimtoria#build#enqueue(state, sid, bid) abort
   let l:eco = vimtoria#data#economy()
   let l:map = vimtoria#data#map()
   if a:state.world.owner[a:sid] !=# a:state.country
-    return l:map.states[a:sid].name . ' は自国領ではありません'
+    return printf(vimtoria#i18n#t('err_not_owned'),
+          \ vimtoria#i18n#name(l:map.states[a:sid]))
   endif
   let l:queue = a:state.world.queues[a:state.country]
   if len(l:queue) >= l:eco.const.build_queue_max
-    return 'キューが一杯です(最大' . l:eco.const.build_queue_max . '件)'
+    return printf(vimtoria#i18n#t('err_queue_full'), l:eco.const.build_queue_max)
   endif
   call add(l:queue, {'sid': a:sid, 'bid': a:bid,
         \ 'done': 0.0, 'total': l:eco.const.build_points})
@@ -49,7 +50,7 @@ endfunction
 function! vimtoria#build#cancel_last(state) abort
   let l:queue = a:state.world.queues[a:state.country]
   if empty(l:queue)
-    return 'キューは空です'
+    return vimtoria#i18n#t('err_queue_empty')
   endif
   call remove(l:queue, -1)
   return ''

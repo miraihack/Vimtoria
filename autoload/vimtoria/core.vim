@@ -4,14 +4,21 @@ scriptencoding utf-8
 " vimtoria#core#state() 経由で読む。書き換えは action() を通す。
 
 let s:MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+let s:MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      \ 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 let s:START_YEAR = 1836
 " 速度 → 1ティック(=ゲーム内1週間)のミリ秒
 let s:SPEED_MS = {1: 2000, 2: 1000, 3: 500, 4: 250}
+
+" 選択系画面(時間停止・操作制限)と、そこで許可するアクション
+let s:PICKER_SCREENS = ['select', 'lang']
+let s:PICKER_ACTIONS = ['nav_j', 'nav_k', 'open_state', 'back', 'load']
 
 let s:state = {}
 let s:timer = -1
 
 function! vimtoria#core#init() abort
+  call vimtoria#i18n#init()
   let l:data = vimtoria#data#map()
   let l:player = get(g:, 'vimtoria_player_country', 'JAP')
   if !has_key(l:data.countries, l:player)
@@ -45,8 +52,11 @@ function! vimtoria#core#start() abort
     return
   endif
   call vimtoria#core#init()
-  " g:vimtoria_player_country 未指定なら国選択画面から始める
-  if !exists('g:vimtoria_player_country')
+  " g:vimtoria_lang 未指定なら言語選択、g:vimtoria_player_country 未指定なら
+  " 国選択から始める(言語 → 国 → マップの順)
+  if !exists('g:vimtoria_lang')
+    let s:state.screen = 'lang'
+  elseif !exists('g:vimtoria_player_country')
     let s:state.screen = 'select'
   endif
   call vimtoria#ui#open()
@@ -73,6 +83,9 @@ endfunction
 
 function! vimtoria#core#date_str(day) abort
   let l:d = vimtoria#core#date(a:day)
+  if vimtoria#i18n#lang() ==# 'en'
+    return printf('%s %d, %d', s:MONTH_EN[l:d.month - 1], l:d.day, l:d.year)
+  endif
   return printf('%d年%2d月%2d日', l:d.year, l:d.month, l:d.day)
 endfunction
 
@@ -83,9 +96,9 @@ endfunction
 " キー入力はすべてここに集約される
 function! vimtoria#core#action(name) abort
   let l:st = vimtoria#core#state()
-  " 国選択画面では選択操作以外を受け付けない(時間も進めない)
-  if l:st.screen ==# 'select'
-        \ && index(['nav_j', 'nav_k', 'open_state', 'back', 'load'], a:name) < 0
+  " 言語/国選択画面では選択操作以外を受け付けない(時間も進めない)
+  if index(s:PICKER_SCREENS, l:st.screen) >= 0
+        \ && index(s:PICKER_ACTIONS, a:name) < 0
     return
   endif
   let l:st.msg = ''
@@ -108,7 +121,13 @@ function! vimtoria#core#action(name) abort
       endif
     endif
   elseif a:name ==# 'open_state'
-    if l:st.screen ==# 'select'
+    if l:st.screen ==# 'lang'
+      " 表示言語を決定して国選択へ
+      call vimtoria#i18n#set(
+            \ vimtoria#screens#lang#choices()[l:st.menu_idx][0])
+      let l:st.screen = exists('g:vimtoria_player_country') ? 'map' : 'select'
+      let l:st.menu_idx = 0
+    elseif l:st.screen ==# 'select'
       " プレイする国を決定
       let l:map = vimtoria#data#map()
       let l:cid = l:map.country_order[l:st.menu_idx]
@@ -117,30 +136,42 @@ function! vimtoria#core#action(name) abort
       let l:st.treasury = float2nr(l:st.world.treasuries[l:cid])
       let l:st.screen = 'map'
       let l:st.menu_idx = 0
-      let l:st.msg = l:map.countries[l:cid].name
-            \ . ' でプレイ開始(Space で時間が流れる)'
+      let l:st.msg = printf(vimtoria#i18n#t('msg_play_start'),
+            \ vimtoria#i18n#name(l:map.countries[l:cid]))
     elseif l:st.screen ==# 'map'
+      " カーソルが州名ラベルの上ならその州を選択して詳細を開く。
+      " それ以外は従来どおり選択中の州の詳細
+      let l:hit = ''
+      if bufname('%') ==# 'vimtoria://game'
+        let l:hit = vimtoria#screens#map#hit(line('.') - 4, col('.') - 1)
+      endif
+      if !empty(l:hit)
+        let l:st.selected = l:hit
+      endif
       let l:st.screen = 'state'
       let l:st.screen_arg = l:st.selected
     elseif l:st.screen ==# 'construction'
       let l:bid = vimtoria#data#economy().buildings_order[l:st.menu_idx]
       let l:err = vimtoria#build#enqueue(l:st, l:st.selected, l:bid)
       let l:st.msg = empty(l:err)
-            \ ? vimtoria#data#economy().buildings[l:bid].name . ' をキューに追加しました'
+            \ ? printf(vimtoria#i18n#t('msg_enqueued'),
+            \          vimtoria#i18n#name(vimtoria#data#economy().buildings[l:bid]))
             \ : l:err
     elseif l:st.screen ==# 'tech'
       let l:data = vimtoria#data#tech()
       let l:tid = l:data.order[l:st.menu_idx]
       let l:err = vimtoria#tech#start(l:st.world, l:st.country, l:tid)
       let l:st.msg = empty(l:err)
-            \ ? l:data.techs[l:tid].name . ' の研究を開始しました'
+            \ ? printf(vimtoria#i18n#t('msg_research_started'),
+            \          vimtoria#i18n#name(l:data.techs[l:tid]))
             \ : l:err
     elseif l:st.screen ==# 'politics'
       let l:data = vimtoria#data#politics()
       let l:lid = l:data.law_order[l:st.menu_idx]
       let l:err = vimtoria#politics#start_enact(l:st.world, l:st.country, l:lid)
       let l:st.msg = empty(l:err)
-            \ ? l:data.laws[l:lid].name . ' の制定を開始しました'
+            \ ? printf(vimtoria#i18n#t('msg_enact_started'),
+            \          vimtoria#i18n#name(l:data.laws[l:lid]))
             \ : l:err
     endif
   elseif a:name =~# '^dip_'
@@ -153,13 +184,14 @@ function! vimtoria#core#action(name) abort
             \ ? vimtoria#war#recruit(l:st.world, l:st.country)
             \ : vimtoria#war#disband(l:st.world, l:st.country)
       let l:st.msg = empty(l:err)
-            \ ? (a:name ==# 'mil_recruit' ? '5個連隊を徴募しました' : '5個連隊を解散しました')
+            \ ? vimtoria#i18n#t(a:name ==# 'mil_recruit'
+            \                   ? 'msg_recruited' : 'msg_disbanded')
             \ : l:err
     endif
   elseif a:name ==# 'cancel'
     if l:st.screen ==# 'construction'
       let l:err = vimtoria#build#cancel_last(l:st)
-      let l:st.msg = empty(l:err) ? '末尾のキュー項目を取り消しました' : l:err
+      let l:st.msg = empty(l:err) ? vimtoria#i18n#t('msg_cancelled') : l:err
     endif
   elseif a:name ==# 'tax_up' || a:name ==# 'tax_down'
     if l:st.screen ==# 'budget'
@@ -170,8 +202,7 @@ function! vimtoria#core#action(name) abort
       let l:max = l:st.world.law_mods[l:st.country].tax_max
       if l:rate > l:max
         let l:rate = l:max
-        let l:st.msg = printf('現行の税制では %.0f%% が上限です(gv で税制を変更)',
-              \ l:max * 100.0)
+        let l:st.msg = printf(vimtoria#i18n#t('msg_tax_cap'), l:max * 100.0)
       elseif l:rate < l:eco.const.tax_min
         let l:rate = l:eco.const.tax_min
       endif
@@ -180,8 +211,7 @@ function! vimtoria#core#action(name) abort
   elseif a:name ==# 'save'
     call vimtoria#core#save()
   elseif a:name ==# 'load'
-    if confirm('セーブデータをロードしますか?(現在の進行は失われます)',
-          \ "&Yes\n&No", 2) == 1
+    if confirm(vimtoria#i18n#t('confirm_load'), "&Yes\n&No", 2) == 1
       call vimtoria#core#load()
     endif
   elseif a:name =~# '^screen_'
@@ -189,7 +219,7 @@ function! vimtoria#core#action(name) abort
     let l:st.screen_arg = ''
     let l:st.menu_idx = 0
   elseif a:name ==# 'back'
-    if l:st.screen ==# 'map' || l:st.screen ==# 'select'
+    if l:st.screen ==# 'map' || index(s:PICKER_SCREENS, l:st.screen) >= 0
       call vimtoria#core#quit()
       return
     endif
@@ -214,10 +244,10 @@ function! vimtoria#core#save() abort
   let l:st = vimtoria#core#state()
   try
     call writefile([json_encode({'version': 1, 'state': l:st})], s:save_file())
-    let l:st.msg = 'セーブしました: ' . s:save_file()
+    let l:st.msg = printf(vimtoria#i18n#t('msg_saved'), s:save_file())
     return 1
   catch
-    let l:st.msg = 'セーブに失敗しました: ' . v:exception
+    let l:st.msg = printf(vimtoria#i18n#t('msg_save_fail'), v:exception)
     return 0
   endtry
 endfunction
@@ -226,24 +256,25 @@ function! vimtoria#core#load() abort
   let l:file = s:save_file()
   let l:st = vimtoria#core#state()
   if !filereadable(l:file)
-    let l:st.msg = 'セーブデータがありません: ' . l:file
+    let l:st.msg = printf(vimtoria#i18n#t('msg_no_save'), l:file)
     return 0
   endif
   try
     let l:data = json_decode(join(readfile(l:file), ''))
   catch
-    let l:st.msg = 'セーブデータを読み込めません: ' . v:exception
+    let l:st.msg = printf(vimtoria#i18n#t('msg_load_fail'), v:exception)
     return 0
   endtry
   if type(l:data) != v:t_dict || get(l:data, 'version', 0) != 1
         \ || !has_key(l:data, 'state')
-    let l:st.msg = 'セーブデータの形式が不正です'
+    let l:st.msg = vimtoria#i18n#t('msg_bad_save')
     return 0
   endif
   let s:state = l:data.state
   let s:state.paused = 1
   let s:state.screen = 'map'
-  let s:state.msg = 'ロードしました(停止中): ' . vimtoria#core#date_str(s:state.day)
+  let s:state.msg = printf(vimtoria#i18n#t('msg_loaded'),
+        \ vimtoria#core#date_str(s:state.day))
   call s:timer_restart()
   return 1
 endfunction
@@ -271,25 +302,10 @@ function! vimtoria#core#click() abort
   call vimtoria#ui#render()
 endfunction
 
-" マップ座標(テンプレートの行・桁)から州を解決する。
-" タグ直上ならその州、近傍なら最寄りのタグ、遠ければ空文字
+" マップ座標(テンプレートの行、行内のバイト位置)から州を解決する。
+" ラベル直上ならその州、近傍なら最寄りのラベル、遠ければ空文字
 function! vimtoria#core#click_resolve(row, col) abort
-  let l:states = vimtoria#data#map().states
-  for [l:sid, l:stt] in items(l:states)
-    if l:stt.row == a:row && a:col >= l:stt.col && a:col < l:stt.col + 5
-      return l:sid
-    endif
-  endfor
-  let l:best = ''
-  let l:best_score = 19
-  for [l:sid, l:stt] in items(l:states)
-    let l:score = abs(a:col - (l:stt.col + 2)) + 3 * abs(a:row - l:stt.row)
-    if l:score < l:best_score
-      let l:best_score = l:score
-      let l:best = l:sid
-    endif
-  endfor
-  return l:best
+  return vimtoria#screens#map#resolve(a:row, a:col)
 endfunction
 
 " 画面ごとのメニュー項目数(0 ならメニュー無し)
@@ -304,6 +320,8 @@ function! s:menu_len(st) abort
     return len(vimtoria#core#diplo_targets(a:st))
   elseif a:st.screen ==# 'select'
     return len(vimtoria#data#map().country_order)
+  elseif a:st.screen ==# 'lang'
+    return len(vimtoria#screens#lang#choices())
   endif
   return 0
 endfunction
@@ -322,32 +340,35 @@ function! s:diplo_action(st, name) abort
   if a:name ==# 'dip_improve'
     let l:err = vimtoria#diplo#improve(l:world, a:st.country, l:other, a:st.day)
     let a:st.msg = empty(l:err)
-          \ ? l:map.countries[l:other].name . ' との関係を改善しました'
+          \ ? printf(vimtoria#i18n#t('msg_improved'),
+          \          vimtoria#i18n#name(l:map.countries[l:other]))
           \ : l:err
   elseif a:name ==# 'dip_alliance'
     let l:was = vimtoria#diplo#allied(l:world, a:st.country, l:other)
     let l:err = vimtoria#diplo#toggle_alliance(l:world, a:st.country, l:other)
     let a:st.msg = empty(l:err)
-          \ ? l:map.countries[l:other].name
-          \   . (l:was ? ' との同盟を破棄しました' : ' と同盟を結びました')
+          \ ? printf(vimtoria#i18n#t(l:was
+          \            ? 'msg_alliance_broken' : 'msg_alliance_formed'),
+          \          vimtoria#i18n#name(l:map.countries[l:other]))
           \ : l:err
   elseif a:name ==# 'dip_war'
     " 奪取目標: マップで選択中の州が相手領ならそこ、でなければ相手の最弱州
     let l:goal = l:world.owner[a:st.selected] ==# l:other
           \ ? a:st.selected : s:weakest_of(l:world, l:other)
     if empty(l:goal)
-      let a:st.msg = '相手国に州がありません'
+      let a:st.msg = vimtoria#i18n#t('msg_no_states')
       return
     endif
     let l:err = vimtoria#diplo#declare_war(l:world, a:st.country, l:other,
           \ l:goal, a:st.day, a:st.country)
     let a:st.msg = empty(l:err)
-          \ ? printf('%s に宣戦布告(目標: %s)',
-          \          l:map.countries[l:other].name, l:map.states[l:goal].name)
+          \ ? printf(vimtoria#i18n#t('msg_war_declared'),
+          \          vimtoria#i18n#name(l:map.countries[l:other]),
+          \          vimtoria#i18n#name(l:map.states[l:goal]))
           \ : l:err
   elseif a:name ==# 'dip_peace'
     let l:err = vimtoria#diplo#white_peace(l:world, a:st.country, l:other, a:st.day)
-    let a:st.msg = empty(l:err) ? '白紙和平が成立しました' : l:err
+    let a:st.msg = empty(l:err) ? vimtoria#i18n#t('msg_white_peace') : l:err
   endif
 endfunction
 
@@ -364,7 +385,7 @@ function! s:weakest_of(world, cid) abort
 endfunction
 
 function! vimtoria#core#quit() abort
-  if confirm('Vimtoria を終了しますか?(S でセーブできます)', "&Yes\n&No", 2) != 1
+  if confirm(vimtoria#i18n#t('confirm_quit'), "&Yes\n&No", 2) != 1
     return
   endif
   call vimtoria#ui#close()

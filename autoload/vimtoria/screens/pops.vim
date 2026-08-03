@@ -20,28 +20,32 @@ function! vimtoria#screens#pops#render(st) abort
   endfor
 
   let l:lines = []
-  call add(l:lines, printf('  ━━ Pop: %s ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        \ l:map.countries[a:st.country].name))
+  call add(l:lines, printf(vimtoria#i18n#t('pp_title'),
+        \ vimtoria#i18n#name(l:map.countries[a:st.country])))
   call add(l:lines, '')
-  call add(l:lines, printf('  労働力 %.0f千人 ┃ 雇用 %.0f千人 ┃ 自給農 %.0f千人 ┃ 生活水準 %.2f',
+  call add(l:lines, printf(vimtoria#i18n#t('pp_stats'),
         \ l:stats.workforce, l:stats.workforce - l:stats.unemployed,
         \ l:stats.unemployed, l:stats.sol))
   call add(l:lines, '')
-  call add(l:lines, '  ── 職業別雇用 ──')
+  call add(l:lines, vimtoria#i18n#t('pp_byprof'))
   for l:prof in ['farmers', 'laborers', 'machinists', 'shopkeepers',
         \ 'capitalists', 'aristocrats']
-    call add(l:lines, printf('    %s %8.0f千人',
-          \ vimtoria#ui#pad(l:eco.professions[l:prof].name, 8),
+    call add(l:lines, printf(vimtoria#i18n#t('pp_prof_row'),
+          \ vimtoria#ui#pad(vimtoria#i18n#name(l:eco.professions[l:prof]), 12),
           \ l:by_prof[l:prof]))
   endfor
   call add(l:lines, '')
-  call add(l:lines, '  ── 州別(失業者は毎週、求人のある州へ少しずつ移動する) ──')
-  call add(l:lines, '    ' . vimtoria#ui#pad('州', 12)
-        \ . printf('%10s %10s %10s', '労働力', '雇用', '自給農'))
+  call add(l:lines, vimtoria#i18n#t('pp_bystate'))
+  call add(l:lines, '    '
+        \ . vimtoria#ui#pad(vimtoria#i18n#t('pp_col_state'), 16)
+        \ . printf(vimtoria#i18n#t('pp_cols'),
+        \          vimtoria#i18n#t('pp_col_wf'),
+        \          vimtoria#i18n#t('pp_col_emp'),
+        \          vimtoria#i18n#t('pp_col_sub')))
   for l:sid in a:st.world.country_states[a:st.country]
     let l:info = vimtoria#econ#state_info(a:st, l:sid)
-    call add(l:lines, printf('    %s%9.0f千 %9.0f千 %9.0f千',
-          \ vimtoria#ui#pad(l:map.states[l:sid].name, 12),
+    call add(l:lines, printf(vimtoria#i18n#t('pp_row'),
+          \ vimtoria#ui#pad(vimtoria#i18n#name(l:map.states[l:sid]), 16),
           \ l:info.workforce, l:info.employed, l:info.unemployed))
   endfor
   return l:lines

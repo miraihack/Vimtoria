@@ -88,10 +88,10 @@ function! vimtoria#politics#start_enact(world, cid, lid) abort
   let l:pol = a:world.politics[a:cid]
   let l:def = l:data.laws[a:lid]
   if l:pol.laws[l:def.group] ==# a:lid
-    return l:def.name . ' は既に施行されています'
+    return printf(vimtoria#i18n#t('err_law_active'), vimtoria#i18n#name(l:def))
   endif
   if l:pol.enact.law ==# a:lid
-    return l:def.name . ' は制定中です'
+    return printf(vimtoria#i18n#t('err_law_enacting'), vimtoria#i18n#name(l:def))
   endif
   let l:pol.enact = {'law': a:lid, 'progress': 0.0}
   return ''
@@ -166,7 +166,7 @@ function! s:complete_enact(world, cid, day, is_player) abort
   let l:pol.enact = {'law': '', 'progress': 0.0}
   call vimtoria#politics#recompute_law_mods(a:world, a:cid)
   if a:is_player
-    call add(a:world.eventlog, printf('%s 【法律制定】%s が施行された',
-          \ vimtoria#core#date_str(a:day), l:def.name))
+    call add(a:world.eventlog, vimtoria#core#date_str(a:day) . ' '
+          \ . printf(vimtoria#i18n#t('log_law_enacted'), vimtoria#i18n#name(l:def)))
   endif
 endfunction

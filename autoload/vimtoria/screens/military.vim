@@ -8,21 +8,21 @@ function! vimtoria#screens#military#render(st) abort
   let l:mil = l:world.military[a:st.country]
 
   let l:lines = []
-  call add(l:lines, printf('  ━━ 軍事: %s ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        \ l:map.countries[a:st.country].name))
+  call add(l:lines, printf(vimtoria#i18n#t('ml_title'),
+        \ vimtoria#i18n#name(l:map.countries[a:st.country])))
   call add(l:lines, '')
   let l:goods = []
   for [l:gid, l:q] in items(l:eco.mil_goods)
-    call add(l:goods, printf('%s %.0f', l:eco.goods[l:gid].name,
-          \ l:q * l:mil.regiments))
+    call add(l:goods, printf('%s %.0f',
+          \ vimtoria#i18n#name(l:eco.goods[l:gid]), l:q * l:mil.regiments))
   endfor
-  call add(l:lines, printf('  連隊 %.0f / 上限 %.0f ┃ 総戦力 %.0f(技術ボーナス込み)',
+  call add(l:lines, printf(vimtoria#i18n#t('ml_stats'),
         \ l:mil.regiments, vimtoria#war#cap(l:world, a:st.country),
         \ vimtoria#war#strength(l:world, a:st.country)))
-  call add(l:lines, printf('  週間維持費 £%s + 物資: %s',
+  call add(l:lines, printf(vimtoria#i18n#t('ml_upkeep'),
         \ vimtoria#ui#fmt_num(float2nr(l:mil.regiments * l:eco.const.mil_upkeep_money)),
         \ join(l:goods, ' ')))
-  call add(l:lines, printf('  徴募: %.0f個連隊あたり £%s と労働力 %.0f千人(最大州から)',
+  call add(l:lines, printf(vimtoria#i18n#t('ml_recruit'),
         \ l:eco.const.mil_recruit_batch,
         \ vimtoria#ui#fmt_num(float2nr(l:eco.const.mil_recruit_batch
         \                              * l:eco.const.mil_recruit_cost)),
@@ -31,24 +31,25 @@ function! vimtoria#screens#military#render(st) abort
     call add(l:lines, '  » ' . a:st.msg)
   endif
   call add(l:lines, '')
-  call add(l:lines, '  ── 交戦中の戦争 ──')
+  call add(l:lines, vimtoria#i18n#t('ml_wars'))
   let l:any = 0
   for l:w in l:world.wars
     if l:w.attacker ==# a:st.country || l:w.defender ==# a:st.country
           \ || index(l:w.allies_d, a:st.country) >= 0
-      let l:side = l:w.attacker ==# a:st.country ? '攻撃側' : '防御側'
-      call add(l:lines, printf('  vs %s(%s)┃ 戦況 %+.0f ┃ 目標: %s',
-            \ l:map.countries[l:w.attacker ==# a:st.country
-            \                 ? l:w.defender : l:w.attacker].name,
-            \ l:side, l:w.score, l:map.states[l:w.goal].name))
+      let l:side = vimtoria#i18n#t(l:w.attacker ==# a:st.country
+            \ ? 'ml_att' : 'ml_def')
+      call add(l:lines, printf(vimtoria#i18n#t('ml_war_row'),
+            \ vimtoria#i18n#name(l:map.countries[l:w.attacker ==# a:st.country
+            \                    ? l:w.defender : l:w.attacker]),
+            \ l:side, l:w.score, vimtoria#i18n#name(l:map.states[l:w.goal])))
       let l:any = 1
     endif
   endfor
   if !l:any
-    call add(l:lines, '  (なし — 宣戦は外交画面 gd から)')
+    call add(l:lines, vimtoria#i18n#t('ml_none'))
   endif
   call add(l:lines, '')
-  call add(l:lines, '  ── 陸軍力トップ10 ──')
+  call add(l:lines, vimtoria#i18n#t('ml_top'))
   let l:rows = []
   for l:cid in keys(l:map.countries)
     if !empty(l:world.country_states[l:cid])
@@ -59,8 +60,10 @@ function! vimtoria#screens#military#render(st) abort
   let l:rank = 1
   for l:row in l:rows[:9]
     call add(l:lines, printf('  %2d. %s %8.0f%s',
-          \ l:rank, vimtoria#ui#pad(l:map.countries[l:row[0]].name, 24),
-          \ l:row[1], l:row[0] ==# a:st.country ? ' ←自国' : ''))
+          \ l:rank,
+          \ vimtoria#ui#pad(vimtoria#i18n#name(l:map.countries[l:row[0]]), 28),
+          \ l:row[1],
+          \ l:row[0] ==# a:st.country ? vimtoria#i18n#t('ml_me') : ''))
     let l:rank += 1
   endfor
   return l:lines

@@ -53,15 +53,15 @@ function! vimtoria#war#recruit(world, cid) abort
   let l:n = l:eco.const.mil_recruit_batch
   let l:mil = a:world.military[a:cid]
   if l:mil.regiments + l:n > vimtoria#war#cap(a:world, a:cid)
-    return '連隊が上限に達しています(労働力を増やすと上限も増える)'
+    return vimtoria#i18n#t('err_mil_cap')
   endif
   let l:cost = l:n * l:eco.const.mil_recruit_cost
   if a:world.treasuries[a:cid] < l:cost
-    return printf('資金不足です(£%.0f 必要)', l:cost)
+    return printf(vimtoria#i18n#t('err_no_funds'), l:cost)
   endif
   let l:sid = s:largest_state(a:world, a:cid)
   if empty(l:sid) || a:world.workforce[l:sid] < l:n + 1.0
-    return '徴募できる労働力がありません'
+    return vimtoria#i18n#t('err_mil_workforce')
   endif
   let a:world.treasuries[a:cid] -= l:cost
   let a:world.workforce[l:sid] -= l:n
@@ -75,7 +75,7 @@ function! vimtoria#war#disband(world, cid) abort
   let l:n = l:eco.const.mil_recruit_batch
   let l:mil = a:world.military[a:cid]
   if l:mil.regiments < l:n
-    return '解散できる連隊がありません'
+    return vimtoria#i18n#t('err_mil_none')
   endif
   let l:mil.regiments -= l:n
   let l:sid = s:largest_state(a:world, a:cid)
@@ -119,13 +119,14 @@ function! vimtoria#war#tick(world, day) abort
     if l:w.score >= 100.0
       call vimtoria#war#annex(a:world, l:w.goal, l:w.attacker)
       call filter(a:world.wars, 'v:val isnot l:w')
-      call vimtoria#war#log(a:world, a:day, printf('【講和】%s が勝利し %s を併合',
-            \ l:map.countries[l:w.attacker].name, l:map.states[l:w.goal].name))
+      call vimtoria#war#log(a:world, a:day, printf(vimtoria#i18n#t('log_war_won'),
+            \ vimtoria#i18n#name(l:map.countries[l:w.attacker]),
+            \ vimtoria#i18n#name(l:map.states[l:w.goal])))
       let a:world.relations[vimtoria#diplo#key(l:w.attacker, l:w.defender)] = -60.0
     elseif l:w.score <= -100.0
       call filter(a:world.wars, 'v:val isnot l:w')
-      call vimtoria#war#log(a:world, a:day, printf('【講和】%s の侵攻は撃退された',
-            \ l:map.countries[l:w.attacker].name))
+      call vimtoria#war#log(a:world, a:day, printf(vimtoria#i18n#t('log_war_lost'),
+            \ vimtoria#i18n#name(l:map.countries[l:w.attacker])))
       let a:world.relations[vimtoria#diplo#key(l:w.attacker, l:w.defender)] = -60.0
       " 敗戦国は動揺する
       let a:world.politics[l:w.attacker].rad += 10.0

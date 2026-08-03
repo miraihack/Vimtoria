@@ -67,16 +67,18 @@ function! vimtoria#tech#start(world, cid, tid) abort
   let l:data = vimtoria#data#tech()
   let l:t = a:world.techs[a:cid]
   if has_key(l:t.done, a:tid)
-    return l:data.techs[a:tid].name . ' は研究済みです'
+    return printf(vimtoria#i18n#t('err_tech_done'),
+          \ vimtoria#i18n#name(l:data.techs[a:tid]))
   endif
   if !vimtoria#tech#available(a:world, a:cid, a:tid)
     let l:missing = []
     for l:req in l:data.techs[a:tid].req
       if !has_key(l:t.done, l:req)
-        call add(l:missing, l:data.techs[l:req].name)
+        call add(l:missing, vimtoria#i18n#name(l:data.techs[l:req]))
       endif
     endfor
-    return '前提技術が未研究です: ' . join(l:missing, '・')
+    return printf(vimtoria#i18n#t('err_tech_req'),
+          \ join(l:missing, vimtoria#i18n#t('list_sep')))
   endif
   let l:t.current = a:tid
   return ''

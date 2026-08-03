@@ -4,26 +4,11 @@ scriptencoding utf-8
 " setbufline で反映する render に分かれる。
 
 let s:bufnr = -1
-let s:match_version = -1
+let s:match_sig = ''
 let s:saved_mouse = v:null
 
-let s:SCREEN_NAMES = {
-      \ 'map': '世界地図',
-      \ 'state': '州情報',
-      \ 'market': '市場',
-      \ 'budget': '予算',
-      \ 'construction': '建設',
-      \ 'tech': '技術',
-      \ 'pops': 'Pop',
-      \ 'ranking': '列強ランキング',
-      \ 'politics': '政治',
-      \ 'diplo': '外交',
-      \ 'military': '軍事',
-      \ 'select': '国選択',
-      \ }
-
 function! vimtoria#ui#screen_name(screen) abort
-  return get(s:SCREEN_NAMES, a:screen, a:screen)
+  return vimtoria#i18n#t('scr_' . a:screen)
 endfunction
 
 function! vimtoria#ui#focus_existing() abort
@@ -51,7 +36,7 @@ function! vimtoria#ui#open() abort
   set mouse=a
   call s:set_keymaps()
   call vimtoria#ui#apply_matches()
-  let s:match_version = vimtoria#core#state().world.map_version
+  let s:match_sig = s:matches_sig(vimtoria#core#state())
   augroup vimtoria_ui
     autocmd! * <buffer>
     autocmd BufWipeout <buffer> call vimtoria#ui#restore_mouse()
@@ -74,15 +59,22 @@ function! vimtoria#ui#close() abort
   let s:bufnr = -1
 endfunction
 
+" 州名ハイライトの再適用が必要になる状態のシグネチャ
+" (併合で所有権が変わる、言語が変わる、選択州が変わる)
+function! s:matches_sig(st) abort
+  return printf('%d:%s:%s',
+        \ a:st.world.map_version, vimtoria#i18n#lang(), a:st.selected)
+endfunction
+
 function! vimtoria#ui#render() abort
   if s:bufnr == -1 || !bufexists(s:bufnr) || bufwinnr(s:bufnr) == -1
     return
   endif
   let l:st = vimtoria#core#state()
-  " 併合などで所有権が変わっていたら国色を再適用
-  if l:st.world.map_version != s:match_version
+  let l:sig = s:matches_sig(l:st)
+  if l:sig !=# s:match_sig
     call win_execute(bufwinid(s:bufnr), 'call vimtoria#ui#apply_matches()')
-    let s:match_version = l:st.world.map_version
+    let s:match_sig = l:sig
   endif
   let l:lines = vimtoria#ui#build_lines(l:st)
   call setbufvar(s:bufnr, '&modifiable', 1)
@@ -118,6 +110,8 @@ function! vimtoria#ui#build_lines(st) abort
     call extend(l:lines, vimtoria#screens#military#render(a:st))
   elseif a:st.screen ==# 'select'
     call extend(l:lines, vimtoria#screens#select#render(a:st))
+  elseif a:st.screen ==# 'lang'
+    call extend(l:lines, vimtoria#screens#lang#render(a:st))
   else
     call extend(l:lines, vimtoria#screens#todo#render(a:st))
   endif
@@ -136,11 +130,12 @@ endfunction
 
 function! s:header_line(st) abort
   if a:st.paused
-    let l:speed = '❚❚ 停止中'
+    let l:speed = vimtoria#i18n#t('hdr_paused')
   else
-    let l:speed = repeat('▶', a:st.speed) . printf(' 速度%d', a:st.speed)
+    let l:speed = repeat('▶', a:st.speed)
+          \ . printf(vimtoria#i18n#t('hdr_speed'), a:st.speed)
   endif
-  return printf(' VIMTORIA ┃ %s ┃ %s ┃ 国庫 £%s ┃ %s',
+  return printf(vimtoria#i18n#t('hdr_fmt'),
         \ vimtoria#core#date_str(a:st.day),
         \ l:speed,
         \ s:fmt_num(a:st.treasury),
@@ -148,26 +143,11 @@ function! s:header_line(st) abort
 endfunction
 
 function! s:hint_line(st) abort
-  if a:st.screen ==# 'map'
-    return ' Space:停止 1-4:速度 hjkl/クリック:州を選択(再クリック:詳細) Enter:州'
-          \ . ' gm:市場 gb:予算 gc:建設 gt:技術 gv:政治 gd:外交 ga:軍事'
-          \ . ' gp:Pop gr:列強 S:セーブ L:ロード q:終了'
-  elseif a:st.screen ==# 'construction'
-    return ' j/k:建物を選択 Enter:キューへ追加 x:末尾を取消 Space:停止/再開 q:マップへ戻る'
-  elseif a:st.screen ==# 'budget'
-    return ' +/-:税率を変更 Space:停止/再開 1-4:速度 q:マップへ戻る'
-  elseif a:st.screen ==# 'tech'
-    return ' j/k:技術を選択 Enter:研究開始 Space:停止/再開 q:マップへ戻る'
-  elseif a:st.screen ==# 'politics'
-    return ' j/k:法律を選択 Enter:制定開始 Space:停止/再開 q:マップへ戻る'
-  elseif a:st.screen ==# 'diplo'
-    return ' j/k:国を選択 i:関係改善 a:同盟/破棄 w:宣戦布告 p:白紙和平 q:マップへ戻る'
-  elseif a:st.screen ==# 'military'
-    return ' r:徴募(+5連隊) d:解散(-5連隊) Space:停止/再開 q:マップへ戻る'
-  elseif a:st.screen ==# 'select'
-    return ' j/k:国を選択 Enter:この国でプレイ開始 q:終了'
+  if index(['map', 'construction', 'budget', 'tech', 'politics',
+        \   'diplo', 'military', 'select', 'lang'], a:st.screen) >= 0
+    return vimtoria#i18n#t('hint_' . a:st.screen)
   endif
-  return ' Space:停止/再開 1-4:速度 q/Esc:マップへ戻る'
+  return vimtoria#i18n#t('hint_default')
 endfunction
 
 function! s:fmt_num(n) abort
@@ -216,17 +196,25 @@ function! s:set_keymaps() abort
   endfor
 endfunction
 
-" 国ごとの州タグ色は現在の所有権(world.owner)から付ける。
-" 併合で所有権が変わると map_version が上がり、render が再適用する
+" 州名ラベルの国別カラーリング。パターンは現在の言語の州名で、
+" 所有権(world.owner)に従って張り直す(併合・言語切替・選択変更で再適用)
 function! vimtoria#ui#apply_matches() abort
   call clearmatches()
   let l:data = vimtoria#data#map()
-  let l:world = vimtoria#core#state().world
+  let l:st = vimtoria#core#state()
+  let l:world = l:st.world
   for [l:cid, l:country] in items(l:data.countries)
-    let l:tags = l:world.country_states[l:cid]
-    if !empty(l:tags)
-      call matchadd(l:country.hl, '\v<(' . join(l:tags, '|') . ')>', 10)
+    let l:names = []
+    for l:sid in l:world.country_states[l:cid]
+      call add(l:names, escape(vimtoria#i18n#name(l:data.states[l:sid]), '\'))
+    endfor
+    if !empty(l:names)
+      call matchadd(l:country.hl,
+            \ '\V\<\(' . join(l:names, '\|') . '\)\>', 10)
     endif
   endfor
-  call matchadd('VimtoriaSelected', '\[\u\{3}\]', 20)
+  " 選択中の州([州名] と表示される)の強調
+  call matchadd('VimtoriaSelected',
+        \ '\V[' . escape(vimtoria#i18n#name(l:data.states[l:st.selected]), '\') . ']',
+        \ 20)
 endfunction

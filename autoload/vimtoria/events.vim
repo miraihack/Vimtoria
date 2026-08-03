@@ -70,7 +70,7 @@ function! vimtoria#events#fire(world, cid, eid, day, is_player) abort
     let l:sid = l:sids[s:roll(len(l:sids))]
     let a:world.workforce[l:sid] =
           \ a:world.workforce[l:sid] * (1.0 + l:fx.workforce_pct)
-    let l:where = vimtoria#data#map().states[l:sid].name . ': '
+    let l:where = vimtoria#i18n#name(vimtoria#data#map().states[l:sid]) . ': '
   endif
   " 時限効果
   if l:fx.duration > 0
@@ -78,8 +78,9 @@ function! vimtoria#events#fire(world, cid, eid, day, is_player) abort
   endif
   call s:recompute(a:world, a:cid)
   if a:is_player
-    call add(a:world.eventlog, printf('%s 【%s】%s%s',
-          \ vimtoria#core#date_str(a:day), l:def.name, l:where, l:def.desc))
+    call add(a:world.eventlog, vimtoria#core#date_str(a:day) . ' '
+          \ . printf(vimtoria#i18n#t('evt_fmt'), vimtoria#i18n#name(l:def),
+          \          l:where, vimtoria#i18n#desc(l:def)))
     if len(a:world.eventlog) > 20
       call remove(a:world.eventlog, 0, len(a:world.eventlog) - 21)
     endif

@@ -70,28 +70,48 @@ for s:id in keys(s:data.states)
   call assert_true(s:moved, s:id . ': どの方向にも動けない')
 endfor
 
-" ---- マウスクリックの州解決 ----
-" タグ直上のクリックはその州(全州)
-for [s:id, s:stt] in items(s:data.states)
-  call assert_equal(s:id, vimtoria#core#click_resolve(s:stt.row, s:stt.col + 2),
-        \ s:id . ': タグ直上のクリックが解決できない')
+" ---- マウスクリック/カーソル位置の州解決(州名ラベル) ----
+call vimtoria#core#init()
+" マップ描画で州名ラベルの位置テーブルができる
+call vimtoria#screens#map#render(vimtoria#core#state())
+let s:labels = vimtoria#screens#map#labels()
+" 全ラベルの直上(先頭と末尾のバイト)でその州に解決される
+let s:seen = {}
+for [s:row, s:entries] in items(s:labels)
+  for s:e in s:entries
+    call assert_equal(s:e[0],
+          \ vimtoria#core#click_resolve(str2nr(s:row), s:e[1]),
+          \ s:e[0] . ': ラベル先頭のクリックが解決できない')
+    call assert_equal(s:e[0],
+          \ vimtoria#core#click_resolve(str2nr(s:row), s:e[2] - 1),
+          \ s:e[0] . ': ラベル末尾のクリックが解決できない')
+    let s:seen[s:e[0]] = 1
+  endfor
 endfor
-" 孤立州(ハワイ)の近傍クリック
-let s:haw = s:data.states['HAW']
-call assert_equal('HAW', vimtoria#core#click_resolve(s:haw.row + 1, s:haw.col + 2))
-call assert_equal('HAW', vimtoria#core#click_resolve(s:haw.row, s:haw.col + 8))
+call assert_equal(len(s:data.states), len(s:seen), '全州のラベルが配置されていない')
+" 孤立州(ハワイ)の近傍クリックは最寄りとして解決される
+let s:haw_e = filter(copy(s:labels[s:data.states['HAW'].row]),
+      \ 'v:val[0] ==# ''HAW''')[0]
+call assert_equal('HAW',
+      \ vimtoria#core#click_resolve(s:data.states['HAW'].row + 1, s:haw_e[1]))
+call assert_equal('HAW',
+      \ vimtoria#core#click_resolve(s:data.states['HAW'].row, s:haw_e[2] + 2))
 " 遠洋のクリックは何も選択しない
 call assert_equal('', vimtoria#core#click_resolve(35, 20))
 call assert_equal('', vimtoria#core#click_resolve(-3, 0))
+" hit() はラベル直上のみ(近傍では空 = Enter は選択中の州へフォールバック)
+call assert_equal('', vimtoria#screens#map#hit(35, 20))
+call assert_equal('HAW', vimtoria#screens#map#hit(s:data.states['HAW'].row, s:haw_e[1]))
 
 " ---- クリックアクション: 選択 → 再クリックで詳細 ----
-call vimtoria#core#init()
 let s:st = vimtoria#core#state()
-let s:edo = s:data.states['EDO']
 " click() は getmousepos() 依存なので resolve+選択ロジックを直接検証
 let s:st.selected = 'KIN'
-let s:hit = vimtoria#core#click_resolve(s:edo.row, s:edo.col + 2)
-call assert_equal('EDO', s:hit)
+call vimtoria#screens#map#render(s:st)
+let s:edo_row = s:data.states['EDO'].row
+let s:edo_e = filter(copy(vimtoria#screens#map#labels()[s:edo_row]),
+      \ 'v:val[0] ==# ''EDO''')[0]
+call assert_equal('EDO', vimtoria#core#click_resolve(s:edo_row, s:edo_e[1]))
 
 " ---- アクション: 画面遷移・選択・速度 ----
 call vimtoria#core#init()
@@ -163,6 +183,34 @@ call vimtoria#core#action('to_map')
 call assert_equal('map', s:st.screen, 'ESCで地図に戻らない')
 call vimtoria#core#action('to_map')
 call assert_equal('map', s:st.screen, '地図上のESCで画面が変わった')
+
+" ---- 言語: 英語表示と言語選択画面 ----
+call vimtoria#i18n#set('en')
+call vimtoria#core#init()
+let s:st = vimtoria#core#state()
+call assert_equal('Jan 1, 1836', vimtoria#core#date_str(0))
+let s:lines = vimtoria#ui#build_lines(s:st)
+call assert_match('Treasury', s:lines[0], '英語ヘッダになっていない')
+call assert_match('World Map', s:lines[0])
+let s:joined = join(s:lines, "\n")
+call assert_match('\[Edo\]', s:joined, '地図に英語の州名がない')
+call assert_match('British Isles', s:joined)
+" 言語選択画面: 選択操作以外を受け付けず、Enter で言語が決まる
+let s:st.screen = 'lang'
+let s:st.menu_idx = 0
+call vimtoria#core#action('pause')
+call assert_equal(1, s:st.paused, '言語選択中に時間が動いた')
+call vimtoria#core#action('screen_market')
+call assert_equal('lang', s:st.screen, '言語選択中に画面が遷移した')
+call vimtoria#core#action('nav_j')
+call vimtoria#core#action('open_state')
+call assert_equal('en', vimtoria#i18n#lang(), '選択した言語になっていない')
+call assert_equal('select', s:st.screen, '言語選択後に国選択へ進まない')
+" 日本語に戻すと同じデータが日本語名で描画される
+call vimtoria#i18n#set('ja')
+let s:st.screen = 'map'
+call assert_match('江戸', join(vimtoria#ui#build_lines(s:st), "\n"))
+call vimtoria#core#init()
 
 " ---- ポーズ切り替え(タイマー起動→即停止) ----
 call vimtoria#core#init()

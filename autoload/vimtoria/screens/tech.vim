@@ -9,18 +9,18 @@ function! vimtoria#screens#tech#render(st) abort
   let l:rate = vimtoria#tech#rate(a:st.world, a:st.country, l:stats.workforce)
 
   let l:lines = []
-  call add(l:lines, printf('  ━━ 技術: %s ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        \ l:map.countries[a:st.country].name))
+  call add(l:lines, printf(vimtoria#i18n#t('tc_title'),
+        \ vimtoria#i18n#name(l:map.countries[a:st.country])))
   call add(l:lines, '')
   if empty(l:t.current)
-    let l:cur = '(未選択 — j/k で選び Enter で研究開始)'
+    let l:cur = vimtoria#i18n#t('tc_none')
   else
     let l:def = l:data.techs[l:t.current]
     let l:done = get(l:t.progress, l:t.current, 0.0)
-    let l:cur = printf('%s %.0f/%.0frp (%.0f%%)', l:def.name,
+    let l:cur = printf('%s %.0f/%.0frp (%.0f%%)', vimtoria#i18n#name(l:def),
           \ l:done, l:def.cost, 100.0 * l:done / l:def.cost)
   endif
-  call add(l:lines, printf('  研究力 %.1frp/週 ┃ 研究中: %s', l:rate, l:cur))
+  call add(l:lines, printf(vimtoria#i18n#t('tc_cur'), l:rate, l:cur))
   if !empty(a:st.msg)
     call add(l:lines, '  » ' . a:st.msg)
   endif
@@ -41,9 +41,10 @@ function! vimtoria#screens#tech#render(st) abort
     if !empty(l:def.req) && !has_key(l:t.done, l:tid)
       let l:names = []
       for l:rid in l:def.req
-        call add(l:names, l:data.techs[l:rid].name)
+        call add(l:names, vimtoria#i18n#name(l:data.techs[l:rid]))
       endfor
-      let l:req = ' 要:' . join(l:names, '・')
+      let l:req = vimtoria#i18n#t('tc_req')
+            \ . join(l:names, vimtoria#i18n#t('list_sep'))
     endif
     let l:prog = ''
     let l:p = get(l:t.progress, l:tid, 0.0)
@@ -52,11 +53,11 @@ function! vimtoria#screens#tech#render(st) abort
     endif
     call add(l:lines, printf('  %s %s %s%4.0frp  %s%s%s',
           \ l:i == a:st.menu_idx ? '>' : ' ', l:mark,
-          \ vimtoria#ui#pad(l:def.name, 12), l:def.cost,
-          \ l:def.desc, l:req, l:prog))
+          \ vimtoria#ui#pad(vimtoria#i18n#name(l:def), 22), l:def.cost,
+          \ vimtoria#i18n#desc(l:def), l:req, l:prog))
     let l:i += 1
   endfor
   call add(l:lines, '')
-  call add(l:lines, '  ✓:研究済 ▶:研究中 ・:研究可 ×:前提未達(切替えても進捗は保存される)')
+  call add(l:lines, vimtoria#i18n#t('tc_legend'))
   return l:lines
 endfunction

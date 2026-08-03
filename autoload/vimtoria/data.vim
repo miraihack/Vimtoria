@@ -104,12 +104,15 @@ function! vimtoria#data#economy() abort
 endfunction
 
 " マップテンプレート中の {TAG} プレースホルダを走査し、
-" 各州の座標 (row, col) をデータに書き込む
+" 各州の座標 (row, col) と、行ごとのタグ一覧 row_tags を書き込む。
+" row_tags[row] = [[col, sid], ...](col 昇順)で、マップ描画が
+" 州名ラベルを左から順に配置するのに使う。
 function! s:locate_states(data) abort
   for l:stt in values(a:data.states)
     let l:stt.row = -1
     let l:stt.col = -1
   endfor
+  let a:data.row_tags = {}
   let l:row = 0
   for l:line in a:data.template
     let l:pos = 0
@@ -122,6 +125,10 @@ function! s:locate_states(data) abort
       if has_key(a:data.states, l:tag)
         let a:data.states[l:tag].row = l:row
         let a:data.states[l:tag].col = l:m[1]
+        if !has_key(a:data.row_tags, l:row)
+          let a:data.row_tags[l:row] = []
+        endif
+        call add(a:data.row_tags[l:row], [l:m[1], l:tag])
       endif
       let l:pos = l:m[2]
     endwhile

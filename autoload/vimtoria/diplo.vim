@@ -64,10 +64,10 @@ function! vimtoria#diplo#improve(world, cid, other, day) abort
   let l:k = vimtoria#diplo#key(a:cid, a:other)
   if has_key(a:world.diplo_cd, l:k)
         \ && a:day - a:world.diplo_cd[l:k] < l:c.improve_cd_weeks * 7
-    return '外交官はまだ交渉中です(26週に1回)'
+    return vimtoria#i18n#t('err_dip_cd')
   endif
   if a:world.treasuries[a:cid] < l:c.improve_cost
-    return printf('資金不足です(£%.0f 必要)', l:c.improve_cost)
+    return printf(vimtoria#i18n#t('err_no_funds'), l:c.improve_cost)
   endif
   let a:world.treasuries[a:cid] -= l:c.improve_cost
   call s:add_relation(a:world, a:cid, a:other, l:c.improve_gain)
@@ -84,10 +84,10 @@ function! vimtoria#diplo#toggle_alliance(world, cid, other) abort
     return ''
   endif
   if !empty(vimtoria#diplo#war_between(a:world, a:cid, a:other))
-    return '交戦中の相手とは同盟できません'
+    return vimtoria#i18n#t('err_ally_war')
   endif
   if vimtoria#diplo#relation(a:world, a:cid, a:other) < l:c.ally_threshold
-    return printf('関係が %.0f 以上必要です', l:c.ally_threshold)
+    return printf(vimtoria#i18n#t('err_ally_rel'), l:c.ally_threshold)
   endif
   let a:world.alliances[l:k] = 1
   return ''
@@ -96,16 +96,16 @@ endfunction
 " 宣戦布告。goal_sid は奪取目標の州
 function! vimtoria#diplo#declare_war(world, cid, other, goal_sid, day, player) abort
   if a:cid ==# a:other
-    return '自国には宣戦できません'
+    return vimtoria#i18n#t('err_war_self')
   endif
   if vimtoria#diplo#allied(a:world, a:cid, a:other)
-    return '同盟国には宣戦できません'
+    return vimtoria#i18n#t('err_war_ally')
   endif
   if !empty(vimtoria#diplo#war_between(a:world, a:cid, a:other))
-    return '既に交戦中です'
+    return vimtoria#i18n#t('err_war_already')
   endif
   if empty(a:world.country_states[a:other])
-    return '相手国は消滅しています'
+    return vimtoria#i18n#t('err_war_dead')
   endif
   " 防御側の同盟国が参戦する
   let l:allies = []
@@ -120,9 +120,10 @@ function! vimtoria#diplo#declare_war(world, cid, other, goal_sid, day, player) a
         \ 'started': a:day})
   let a:world.relations[vimtoria#diplo#key(a:cid, a:other)] = -100.0
   let l:map = vimtoria#data#map()
-  call vimtoria#war#log(a:world, a:day, printf('【宣戦布告】%s が %s に宣戦(目標: %s)',
-        \ l:map.countries[a:cid].name, l:map.countries[a:other].name,
-        \ l:map.states[a:goal_sid].name))
+  call vimtoria#war#log(a:world, a:day, printf(vimtoria#i18n#t('log_war_declared'),
+        \ vimtoria#i18n#name(l:map.countries[a:cid]),
+        \ vimtoria#i18n#name(l:map.countries[a:other]),
+        \ vimtoria#i18n#name(l:map.states[a:goal_sid])))
   return ''
 endfunction
 
@@ -130,12 +131,13 @@ endfunction
 function! vimtoria#diplo#white_peace(world, cid, other, day) abort
   let l:w = vimtoria#diplo#war_between(a:world, a:cid, a:other)
   if empty(l:w)
-    return '交戦していません'
+    return vimtoria#i18n#t('err_no_war')
   endif
   call filter(a:world.wars, 'v:val isnot l:w')
   let l:map = vimtoria#data#map()
-  call vimtoria#war#log(a:world, a:day, printf('【和平】%s と %s が白紙和平',
-        \ l:map.countries[l:w.attacker].name, l:map.countries[l:w.defender].name))
+  call vimtoria#war#log(a:world, a:day, printf(vimtoria#i18n#t('log_white_peace'),
+        \ vimtoria#i18n#name(l:map.countries[l:w.attacker]),
+        \ vimtoria#i18n#name(l:map.countries[l:w.defender])))
   return ''
 endfunction
 

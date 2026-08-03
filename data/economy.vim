@@ -67,26 +67,26 @@ let g:vimtoria_data_economy.goods_order = [
       \ ]
 
 let g:vimtoria_data_economy.goods = {
-      \ 'grain':     {'name': '穀物',     'base': 20.0},
-      \ 'cotton':    {'name': '綿花',     'base': 25.0},
-      \ 'wood':      {'name': '木材',     'base': 20.0},
-      \ 'coal':      {'name': '石炭',     'base': 30.0},
-      \ 'iron':      {'name': '鉄',       'base': 40.0},
-      \ 'steel':     {'name': '鋼鉄',     'base': 60.0},
-      \ 'tools':     {'name': '工具',     'base': 45.0},
-      \ 'clothes':   {'name': '衣類',     'base': 40.0},
-      \ 'furniture': {'name': '家具',     'base': 45.0},
-      \ 'services':  {'name': 'サービス', 'base': 35.0},
+      \ 'grain':     {'name': '穀物',     'name_en': 'Grain',     'base': 20.0},
+      \ 'cotton':    {'name': '綿花',     'name_en': 'Cotton',    'base': 25.0},
+      \ 'wood':      {'name': '木材',     'name_en': 'Wood',      'base': 20.0},
+      \ 'coal':      {'name': '石炭',     'name_en': 'Coal',      'base': 30.0},
+      \ 'iron':      {'name': '鉄',       'name_en': 'Iron',      'base': 40.0},
+      \ 'steel':     {'name': '鋼鉄',     'name_en': 'Steel',     'base': 60.0},
+      \ 'tools':     {'name': '工具',     'name_en': 'Tools',     'base': 45.0},
+      \ 'clothes':   {'name': '衣類',     'name_en': 'Clothes',   'base': 40.0},
+      \ 'furniture': {'name': '家具',     'name_en': 'Furniture', 'base': 45.0},
+      \ 'services':  {'name': 'サービス', 'name_en': 'Services',  'base': 35.0},
       \ }
 
 " owner=1 の職業は賃金でなく配当を受け取る
 let g:vimtoria_data_economy.professions = {
-      \ 'farmers':     {'name': '農民',   'owner': 0},
-      \ 'laborers':    {'name': '労働者', 'owner': 0},
-      \ 'machinists':  {'name': '機械工', 'owner': 0},
-      \ 'shopkeepers': {'name': '店主',   'owner': 0},
-      \ 'capitalists': {'name': '資本家', 'owner': 1},
-      \ 'aristocrats': {'name': '貴族',   'owner': 1},
+      \ 'farmers':     {'name': '農民',   'name_en': 'Farmers',     'owner': 0},
+      \ 'laborers':    {'name': '労働者', 'name_en': 'Laborers',    'owner': 0},
+      \ 'machinists':  {'name': '機械工', 'name_en': 'Machinists',  'owner': 0},
+      \ 'shopkeepers': {'name': '店主',   'name_en': 'Shopkeepers', 'owner': 0},
+      \ 'capitalists': {'name': '資本家', 'name_en': 'Capitalists', 'owner': 1},
+      \ 'aristocrats': {'name': '貴族',   'name_en': 'Aristocrats', 'owner': 1},
       \ }
 
 " 週次需要(雇用 1 千人あたり)。owner は base に加えて追加分を消費する
@@ -107,33 +107,43 @@ let g:vimtoria_data_economy.buildings_order = [
 
 let g:vimtoria_data_economy.buildings = {
       \ 'grain_farm': {
-      \   'name': '穀物農場', 'out': {'grain': 50.0}, 'in': {'tools': 1.0},
+      \   'name': '穀物農場', 'name_en': 'Grain Farm',
+      \   'out': {'grain': 50.0}, 'in': {'tools': 1.0},
       \   'jobs': {'farmers': 9.0, 'aristocrats': 1.0}, 'share': 0.35},
       \ 'cotton_farm': {
-      \   'name': '綿花農場', 'out': {'cotton': 50.0}, 'in': {'tools': 1.0},
+      \   'name': '綿花農場', 'name_en': 'Cotton Farm',
+      \   'out': {'cotton': 50.0}, 'in': {'tools': 1.0},
       \   'jobs': {'farmers': 9.0, 'aristocrats': 1.0}, 'share': 0.03},
       \ 'logging_camp': {
-      \   'name': '伐採所', 'out': {'wood': 25.0}, 'in': {'tools': 1.0},
+      \   'name': '伐採所', 'name_en': 'Logging Camp',
+      \   'out': {'wood': 25.0}, 'in': {'tools': 1.0},
       \   'jobs': {'laborers': 9.0, 'capitalists': 1.0}, 'share': 0.025},
       \ 'coal_mine': {
-      \   'name': '炭鉱', 'out': {'coal': 45.0}, 'in': {'tools': 2.0},
+      \   'name': '炭鉱', 'name_en': 'Coal Mine',
+      \   'out': {'coal': 45.0}, 'in': {'tools': 2.0},
       \   'jobs': {'laborers': 9.0, 'aristocrats': 1.0}, 'share': 0.0025},
       \ 'iron_mine': {
-      \   'name': '鉄山', 'out': {'iron': 40.0}, 'in': {'tools': 2.0},
+      \   'name': '鉄山', 'name_en': 'Iron Mine',
+      \   'out': {'iron': 40.0}, 'in': {'tools': 2.0},
       \   'jobs': {'laborers': 9.0, 'aristocrats': 1.0}, 'share': 0.006},
       \ 'tool_workshop': {
-      \   'name': '工具工房', 'out': {'tools': 35.0}, 'in': {'wood': 10.0, 'iron': 10.0},
+      \   'name': '工具工房', 'name_en': 'Tool Workshop',
+      \   'out': {'tools': 35.0}, 'in': {'wood': 10.0, 'iron': 10.0},
       \   'jobs': {'machinists': 8.0, 'capitalists': 2.0}, 'share': 0.015},
       \ 'textile_mill': {
-      \   'name': '織物工場', 'out': {'clothes': 45.0}, 'in': {'cotton': 25.0, 'tools': 1.0},
+      \   'name': '織物工場', 'name_en': 'Textile Mill',
+      \   'out': {'clothes': 45.0}, 'in': {'cotton': 25.0, 'tools': 1.0},
       \   'jobs': {'machinists': 8.0, 'capitalists': 2.0}, 'share': 0.06},
       \ 'furniture_workshop': {
-      \   'name': '家具工房', 'out': {'furniture': 35.0}, 'in': {'wood': 15.0, 'steel': 5.0, 'tools': 1.0},
+      \   'name': '家具工房', 'name_en': 'Furniture Workshop',
+      \   'out': {'furniture': 35.0}, 'in': {'wood': 15.0, 'steel': 5.0, 'tools': 1.0},
       \   'jobs': {'machinists': 8.0, 'capitalists': 2.0}, 'share': 0.025},
       \ 'steel_mill': {
-      \   'name': '製鉄所', 'out': {'steel': 30.0}, 'in': {'iron': 20.0, 'coal': 20.0},
+      \   'name': '製鉄所', 'name_en': 'Steel Mill',
+      \   'out': {'steel': 30.0}, 'in': {'iron': 20.0, 'coal': 20.0},
       \   'jobs': {'machinists': 8.0, 'capitalists': 2.0}, 'share': 0.004},
       \ 'urban_center': {
-      \   'name': '商業地区', 'out': {'services': 50.0}, 'in': {},
+      \   'name': '商業地区', 'name_en': 'Urban Center',
+      \   'out': {'services': 50.0}, 'in': {},
       \   'jobs': {'shopkeepers': 9.0, 'capitalists': 1.0}, 'share': 0.05},
       \ }
