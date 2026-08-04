@@ -176,7 +176,8 @@ function! vimtoria#core#action(name) abort
       " それ以外は従来どおり選択中の州の詳細
       let l:hit = ''
       if bufname('%') ==# 'vimtoria://game'
-        let l:hit = vimtoria#screens#map#hit(line('.') - 4, col('.') - 1)
+        let l:hit = vimtoria#screens#map#hit(
+              \ line('.') - vimtoria#ui#map_top(), col('.') - 1)
       endif
       if !empty(l:hit)
         let l:st.selected = l:hit
@@ -367,8 +368,9 @@ function! vimtoria#core#click() abort
   if l:st.screen !=# 'map'
     return
   endif
-  " マップは ヘッダ・ヒント・空行 の 3 行の下(バッファ 4 行目)から始まる
-  let l:sid = vimtoria#core#click_resolve(l:pos.line - 4, l:pos.column - 1)
+  " マップは ヘッダ・ヒント(折り返しで可変)・空行 の下から始まる
+  let l:sid = vimtoria#core#click_resolve(
+        \ l:pos.line - vimtoria#ui#map_top(), l:pos.column - 1)
   if empty(l:sid)
     return
   endif

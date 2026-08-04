@@ -16,12 +16,22 @@ let s:in_render = 0
 " 固定行を常に見えている位置へ描き直す
 let s:cur_leftcol = 0
 let s:win_lc = 0
+" ヒント(キー操作の紹介)は現在のウィンドウ幅で折り返して複数行にする。
+" 折り返し後の行数(地図の行オフセット map_top の計算に使う)
+let s:hint_rows = 1
+let s:win_width = 0
 " 地図 1 周分の表示幅(200 桁)。バッファには 2 周分描かれている
 let s:MAP_W = 200
 
 " 地図画面の固定行(ヘッダ・フッタ)の字下げ量
 function! vimtoria#ui#map_leftcol() abort
   return s:cur_leftcol
+endfunction
+
+" 地図のテンプレート行 0(または画面本文の先頭)が始まるバッファ行番号。
+" ヘッダ 1 行 + ヒント n 行(折り返しで可変)+ 空行 1 行 の次
+function! vimtoria#ui#map_top() abort
+  return s:hint_rows + 3
 endfunction
 
 function! vimtoria#ui#_capture_lc() abort
@@ -59,6 +69,21 @@ function! vimtoria#ui#focus_existing() abort
   return 1
 endfunction
 
+" 国色などのハイライトグループを定義する。syntax/vimtoria.vim は
+" :syntax off の環境では読み込まれないため、matchadd が E28 で失敗しない
+" よう起動時に必ずここで定義する(hi default なので上書きはしない)
+function! s:ensure_highlights() abort
+  hi def VimtoriaSelected cterm=bold,reverse gui=bold,reverse
+  hi def VimtoriaCountry1 cterm=bold ctermfg=2 gui=bold guifg=#7bc96f
+  hi def VimtoriaCountry2 ctermfg=1 guifg=#e06c75
+  hi def VimtoriaCountry3 ctermfg=3 guifg=#e5c07b
+  hi def VimtoriaCountry4 ctermfg=5 guifg=#c678dd
+  hi def VimtoriaCountry5 ctermfg=4 guifg=#61afef
+  hi def VimtoriaCountry6 ctermfg=6 guifg=#56b6c2
+  hi def VimtoriaCountry7 ctermfg=7 guifg=#abb2bf
+  hi def VimtoriaCountry8 ctermfg=9 guifg=#d19a66
+endfunction
+
 function! vimtoria#ui#open() abort
   enew
   let s:bufnr = bufnr('%')
@@ -66,6 +91,7 @@ function! vimtoria#ui#open() abort
   setlocal nonumber norelativenumber nolist nowrap nomodifiable
   setlocal signcolumn=no filetype=vimtoria
   silent! execute 'file vimtoria://game'
+  call s:ensure_highlights()
   " マップのクリック選択のためにマウスを有効化(終了時に復元する)
   let s:saved_mouse = &mouse
   set mouse=a
@@ -110,6 +136,16 @@ function! vimtoria#ui#on_scroll() abort
   if vimtoria#core#state().screen !=# 'map'
     return
   endif
+  " 実際に位置がずれたときだけ描き直す。ここでの判定は win_execute を
+  " 使わない — win_execute のウィンドウ出入り自体が WinScrolled を
+  " 再発火させ、無限ループになることがある(実 Vim)
+  if win_getid() != bufwinid(s:bufnr)
+    return
+  endif
+  let l:lc = winsaveview().leftcol
+  if l:lc == s:cur_leftcol && l:lc >= 1 && l:lc <= s:MAP_W
+    return
+  endif
   " 巻き戻しと固定行(ヘッダ・フッタ)の字下げ調整のため描き直す
   call vimtoria#ui#render()
 endfunction
@@ -131,7 +167,7 @@ function! vimtoria#ui#_normalize_in_win() abort
   endif
   " カーソルも同じ見た目の位置(もう一方のコピー)へ移す。
   " 地図の行の上にいないときは巻き戻せないので何もしない
-  let l:rb = vimtoria#screens#map#row_bytes(l:v.lnum - 4)
+  let l:rb = vimtoria#screens#map#row_bytes(l:v.lnum - vimtoria#ui#map_top())
   if l:rb <= 0
     return
   endif
@@ -174,7 +210,7 @@ function! vimtoria#ui#center_map() abort
   endif
   call win_execute(l:winid, printf(
         \ 'call winrestview({"lnum": %d, "col": %d, "leftcol": %d, "topline": 1})',
-        \ l:pos[0] + 4, l:col, l:lc))
+        \ l:pos[0] + vimtoria#ui#map_top(), l:col, l:lc))
   call win_execute(l:winid, 'call vimtoria#ui#save_map_view()')
 endfunction
 
@@ -231,7 +267,9 @@ function! s:render_impl() abort
   if l:screen_changed && s:last_screen ==# 'map'
     call win_execute(bufwinid(s:bufnr), 'call vimtoria#ui#save_map_view()')
   endif
-  " 地図の固定行の字下げに使う現在の水平スクロール位置
+  " 地図の固定行の字下げに使う現在の水平スクロール位置と、
+  " ヒント折り返しに使うウィンドウ幅
+  let s:win_width = winwidth(bufwinid(s:bufnr))
   if l:st.screen ==# 'map' && !l:screen_changed
     let s:cur_leftcol = s:win_leftcol()
   endif
@@ -294,7 +332,14 @@ function! vimtoria#ui#build_lines(st) abort
   " 地図画面では、右へスクロールしていてもヘッダ・ヒントが読めるよう
   " 現在の水平スクロール位置まで字下げする(フッタは screens/map が行う)
   let l:ind = a:st.screen ==# 'map' ? repeat(' ', s:cur_leftcol) : ''
-  let l:lines = [l:ind . s:header_line(a:st), l:ind . s:hint_line(a:st), '']
+  " ヒントはウィンドウの右端で折り返して全部読めるようにする
+  let l:hints = s:wrap_hint(s:hint_line(a:st), s:win_width)
+  let s:hint_rows = len(l:hints)
+  let l:lines = [l:ind . s:header_line(a:st)]
+  for l:h in l:hints
+    call add(l:lines, l:ind . l:h)
+  endfor
+  call add(l:lines, '')
   if a:st.screen ==# 'map'
     call extend(l:lines, vimtoria#screens#map#render(a:st))
   elseif a:st.screen ==# 'state'
@@ -350,6 +395,30 @@ function! s:header_line(st) abort
         \ l:speed,
         \ s:fmt_num(a:st.treasury),
         \ vimtoria#ui#screen_name(a:st.screen))
+endfunction
+
+" ヒント行を表示幅ベースで語単位に折り返す(全角対応)。
+" ウィンドウ幅が不明(ヘッドレス)なら折り返さない
+function! s:wrap_hint(text, width) abort
+  if a:width < 20
+    return [a:text]
+  endif
+  let l:limit = a:width - 2
+  let l:out = []
+  let l:cur = ''
+  for l:word in split(a:text, ' \+')
+    let l:cand = (empty(l:cur) ? ' ' : l:cur . ' ') . l:word
+    if !empty(l:cur) && strdisplaywidth(l:cand) > l:limit
+      call add(l:out, l:cur)
+      let l:cur = ' ' . l:word
+    else
+      let l:cur = l:cand
+    endif
+  endfor
+  if !empty(l:cur)
+    call add(l:out, l:cur)
+  endif
+  return empty(l:out) ? [a:text] : l:out
 endfunction
 
 function! s:hint_line(st) abort

@@ -24,8 +24,8 @@ function! vimtoria#screens#select#render(st) abort
         \          vimtoria#i18n#t('sl_col_army'),
         \          vimtoria#i18n#t('sl_col_econ')))
   call add(l:lines, '  ' . repeat('─', 78))
-  " 国行の開始バッファ行を記録(ui がヘッダ等 3 行を前置するので +4)
-  let s:row0 = len(l:lines) + 4
+  " 国行の開始バッファ行を記録(ui のヘッダ+ヒント(可変)+空行の分を加算)
+  let s:row0 = len(l:lines) + vimtoria#ui#map_top()
   let l:i = 0
   for l:cid in l:map.country_order
     let l:pop = 0

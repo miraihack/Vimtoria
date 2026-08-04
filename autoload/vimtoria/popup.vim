@@ -116,7 +116,7 @@ function! vimtoria#popup#update(bufnr, st) abort
   else
     let l:pos = s:eff_anchor(l:pos)
     let l:left = l:pos[4] - s:view.leftcol <= s:view.width - 45
-    call s:show('sel', l:winid, l:pos[0] + 4,
+    call s:show('sel', l:winid, l:pos[0] + vimtoria#ui#map_top(),
           \ l:left ? l:pos[2] : l:pos[1], l:left,
           \ vimtoria#popup#country(a:st, a:st.world.owner[a:st.selected]))
   endif
@@ -126,7 +126,7 @@ function! vimtoria#popup#update(bufnr, st) abort
     call s:hide('own')
   else
     let l:haw = s:eff_anchor(l:haw)
-    call s:show('own', l:winid, l:haw[0] + 4 + 2,
+    call s:show('own', l:winid, l:haw[0] + vimtoria#ui#map_top() + 2,
           \ l:haw[1] > 4 ? l:haw[1] - 4 : l:haw[1], 1,
           \ vimtoria#popup#country(a:st, a:st.country))
   endif
