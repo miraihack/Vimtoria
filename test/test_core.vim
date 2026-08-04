@@ -39,7 +39,7 @@ for s:line in s:data.template
   call assert_equal(strlen(s:data.template[0]), strlen(s:line),
         \ 'マップの行幅が不揃い: ' . s:line)
 endfor
-" 精緻化後のグリッドサイズ(tools/gen_map.py の設定と一致)
+" 精緻化後のグリッドサイズ(tools/gen_map.vim の設定と一致)
 call assert_equal(200, strlen(s:data.template[0]))
 call assert_equal(37, len(s:data.template))
 " 各国の capital が実在し、その国に属する

@@ -1,6 +1,6 @@
 scriptencoding utf-8
 " data/map.vim - 1836年の地球マップ定義
-" template: ASCII 世界地図(200x37)。tools/gen_map.py が緯度経度の海岸線
+" template: ASCII 世界地図(200x37)。tools/gen_map.vim が緯度経度の海岸線
 "           ポリゴンから生成した data/map_ascii.vim を読み込む。
 "           {TAG} は州プレースホルダ(描画時に州名ラベルへ置換される)。
 "           ~ は海。

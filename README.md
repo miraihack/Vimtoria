@@ -307,15 +307,15 @@ AI 国も支持 60% を超えた運動には譲歩を始めるので、19世紀�
 | アメリカ合衆国 | ニューイングランド・東部・南部諸州・西部領 |
 | オスマン帝国 | アナトリア・ルメリア・メソポタミア・チュニス |
 
-世界地図は `tools/gen_map.py` が**緯度経度の海岸線ポリゴン**(27 陸塊+
+世界地図は `tools/gen_map.vim`(純 Vim script)が**緯度経度の海岸線ポリゴン**(27 陸塊+
 黒海・カスピ海)をラスタライズして生成する。州アンカーは実座標で配置され、
 衝突はビルド時に検査される。描画時にアンカー位置へ州名ラベル(表示言語に
 応じて日本語名 / 英語正式名称)が重ねられる。地図を改良したいときはポリゴンを編集して
 再生成するだけ:
 
 ```sh
-python3 tools/gen_map.py            # data/map_ascii.vim を再生成
-python3 tools/gen_map.py --preview  # 端末でプレビュー
+nvim --headless -u NONE -S tools/gen_map.vim     # data/map_ascii.vim を再生成
+nvim --headless -u NONE -c 'let g:gen_map_preview=1' -S tools/gen_map.vim  # プレビュー
 ```
 
 ## アーキテクチャ
@@ -347,7 +347,7 @@ data/
 └── events.vim               イベント定義
 syntax/vimtoria.vim          画面ハイライト(国色は matchadd で動的に)
 doc/vimtoria.txt             :help vimtoria
-tools/gen_map.py             世界地図ジェネレータ
+tools/gen_map.vim            世界地図ジェネレータ(これも純 Vim script)
 test/                        ヘッドレステスト 7 スイート
 ```
 
