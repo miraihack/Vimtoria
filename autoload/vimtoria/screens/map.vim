@@ -8,8 +8,10 @@ scriptencoding utf-8
 " <Enter>(カーソル位置)とマウスクリックの州解決に使う。
 
 " row -> [[sid, byte_start, byte_end, disp_start, disp_end], ...]
+" 位置は 1 周目のもの。バッファには世界が 2 周分並ぶ(ループスクロール用)
 let s:labels = {}
 let s:lines = []
+let s:row_bytes = []
 let s:ready = 0
 
 function! vimtoria#screens#map#render(st) abort
@@ -17,14 +19,18 @@ function! vimtoria#screens#map#render(st) abort
   let l:sel = a:st.selected
   let s:labels = {}
   let s:lines = []
+  let s:row_bytes = []
   let s:ready = 1
   let l:lines = []
   let l:row = 0
   for l:tmpl in l:data.template
     let l:line = has_key(l:data.row_tags, l:row)
           \ ? s:layout(l:data, l:row, l:tmpl, l:sel) : l:tmpl
-    call add(l:lines, l:line)
+    " 世界を 2 周分並べる。横スクロールが端に達したら ui.vim が
+    " 見た目の同じ反対側のコピーへ巻き戻し、地球を一周できる
+    call add(l:lines, l:line . l:line)
     call add(s:lines, l:line)
+    call add(s:row_bytes, len(l:line))
     let l:row += 1
   endfor
   call add(l:lines, '')
@@ -99,6 +105,18 @@ function! vimtoria#screens#map#labels() abort
   return s:labels
 endfunction
 
+" 1 周分の行のバイト長(2 周目の座標の正規化・変換に使う)
+function! vimtoria#screens#map#row_bytes(row) abort
+  call s:ensure()
+  return a:row >= 0 && a:row < len(s:row_bytes) ? s:row_bytes[a:row] : 0
+endfunction
+
+" 2 周分に複製された行のバイト位置を 1 周目の位置に正規化する
+function! s:norm(row, col) abort
+  let l:rb = a:row >= 0 && a:row < len(s:row_bytes) ? s:row_bytes[a:row] : 0
+  return l:rb > 0 && a:col >= l:rb ? a:col - l:rb : a:col
+endfunction
+
 " 指定した州のラベル位置 [row, byte_start, byte_end, disp_start, disp_end]。
 " 未配置なら []。概況ポップアップの位置決めに使う
 function! vimtoria#screens#map#label_pos(sid) abort
@@ -114,10 +132,12 @@ function! vimtoria#screens#map#label_pos(sid) abort
 endfunction
 
 " ラベル直上の判定のみ(カーソル位置の <Enter> 用)。col はバイト位置
+" (2 周目のコピー上の位置でもよい)
 function! vimtoria#screens#map#hit(row, col) abort
   call s:ensure()
+  let l:col = s:norm(a:row, a:col)
   for l:e in get(s:labels, a:row, [])
-    if a:col >= l:e[1] && a:col < l:e[2]
+    if l:col >= l:e[1] && l:col < l:e[2]
       return l:e[0]
     endif
   endfor
@@ -125,16 +145,17 @@ function! vimtoria#screens#map#hit(row, col) abort
 endfunction
 
 " クリック用の州解決。ラベル直上ならその州、近傍なら最寄りのラベル、
-" 遠洋なら空文字。col はバイト位置
+" 遠洋なら空文字。col はバイト位置(2 周目のコピー上でもよい)
 function! vimtoria#screens#map#resolve(row, col) abort
   call s:ensure()
   let l:hit = vimtoria#screens#map#hit(a:row, a:col)
   if !empty(l:hit)
     return l:hit
   endif
+  let l:col = s:norm(a:row, a:col)
   " 近傍判定はバイトでなく表示幅の座標で行う(ラベルは全角を含むため)
   let l:disp = a:row >= 0 && a:row < len(s:lines)
-        \ ? strdisplaywidth(strpart(s:lines[a:row], 0, a:col)) : a:col
+        \ ? strdisplaywidth(strpart(s:lines[a:row], 0, l:col)) : l:col
   let l:best = ''
   let l:best_score = 16
   for [l:r, l:entries] in items(s:labels)

@@ -8,6 +8,9 @@ let s:match_sig = ''
 let s:saved_mouse = v:null
 let s:last_screen = ''
 let s:map_view = {}
+let s:normalizing = 0
+" 地図 1 周分の表示幅(200 桁)。バッファには 2 周分描かれている
+let s:MAP_W = 200
 
 function! vimtoria#ui#screen_name(screen) abort
   return vimtoria#i18n#t('scr_' . a:screen)
@@ -50,6 +53,10 @@ function! vimtoria#ui#open() abort
     autocmd BufWipeout <buffer> call vimtoria#ui#restore_mouse()
           \ | call vimtoria#popup#hide()
           \ | call vimtoria#core#shutdown()
+    " 地図の横スクロールが端に達したら反対側の世界コピーへ巻き戻す
+    if exists('##WinScrolled')
+      autocmd WinScrolled <buffer> call vimtoria#ui#on_scroll()
+    endif
   augroup END
   call vimtoria#ui#render()
 endfunction
@@ -62,6 +69,78 @@ function! vimtoria#ui#restore_map_view() abort
   if !empty(s:map_view)
     call winrestview(s:map_view)
   endif
+endfunction
+
+" 地図のループスクロール: バッファには世界が 2 周分描かれている。
+" leftcol が 1 周目の左端(0)や右端(200 超)に達したら、見た目が同一の
+" 反対側のコピーへ leftcol とカーソルを 1 周分ずらす。ユーザーには
+" 継ぎ目が見えず、右(左)へスクロールし続けると地球を一周して戻る
+function! vimtoria#ui#on_scroll() abort
+  if s:normalizing || s:bufnr == -1 || bufwinid(s:bufnr) == -1
+        \ || !vimtoria#core#running()
+    return
+  endif
+  if vimtoria#core#state().screen !=# 'map'
+    return
+  endif
+  let s:normalizing = 1
+  call win_execute(bufwinid(s:bufnr), 'call vimtoria#ui#_normalize_in_win()')
+  let s:normalizing = 0
+endfunction
+
+function! vimtoria#ui#_normalize_in_win() abort
+  let l:v = winsaveview()
+  let l:shift = l:v.leftcol > s:MAP_W ? -1 : (l:v.leftcol < 1 ? 1 : 0)
+  if l:shift == 0
+    return
+  endif
+  " カーソルも同じ見た目の位置(もう一方のコピー)へ移す。
+  " 地図の行の上にいないときは巻き戻せないので何もしない
+  let l:rb = vimtoria#screens#map#row_bytes(l:v.lnum - 4)
+  if l:rb <= 0
+    return
+  endif
+  let l:col = l:v.col + l:shift * l:rb
+  if l:col < 0 || l:col >= 2 * l:rb
+    return
+  endif
+  call winrestview({'lnum': l:v.lnum, 'col': l:col, 'topline': l:v.topline,
+        \ 'leftcol': l:v.leftcol + l:shift * s:MAP_W})
+endfunction
+
+" プレイヤーの首都が画面中央に来るように地図をスクロールする
+" (ゲーム開始時・国選択時に呼ばれる)
+function! vimtoria#ui#center_map() abort
+  if s:bufnr == -1 || bufwinid(s:bufnr) == -1
+    return
+  endif
+  let l:st = vimtoria#core#state()
+  if l:st.screen !=# 'map'
+    return
+  endif
+  let l:cap = vimtoria#data#map().countries[l:st.country].capital
+  let l:pos = vimtoria#screens#map#label_pos(l:cap)
+  if empty(l:pos)
+    return
+  endif
+  let l:winid = bufwinid(s:bufnr)
+  let l:center = (l:pos[3] + l:pos[4]) / 2
+  let l:lc = l:center - winwidth(l:winid) / 2
+  while l:lc < 1
+    let l:lc += s:MAP_W
+  endwhile
+  if l:lc > s:MAP_W
+    let l:lc -= s:MAP_W
+  endif
+  " 首都ラベルが見える側の世界コピーにカーソルを置く
+  let l:col = l:pos[1]
+  if l:center < l:lc
+    let l:col += vimtoria#screens#map#row_bytes(l:pos[0])
+  endif
+  call win_execute(l:winid, printf(
+        \ 'call winrestview({"lnum": %d, "col": %d, "leftcol": %d, "topline": 1})',
+        \ l:pos[0] + 4, l:col, l:lc))
+  call win_execute(l:winid, 'call vimtoria#ui#save_map_view()')
 endfunction
 
 function! vimtoria#ui#restore_mouse() abort
@@ -132,8 +211,10 @@ function! vimtoria#ui#render() abort
       endif
     endfor
   endif
-  " 世界地図では選択中の州の所有国の概況をポップアップ表示する
+  " 世界地図では、端に達したスクロールを巻き戻してから
+  " 選択中の州の所有国の概況をポップアップ表示する
   if l:st.screen ==# 'map'
+    call vimtoria#ui#on_scroll()
     call vimtoria#popup#update(s:bufnr, l:st)
   else
     call vimtoria#popup#hide()

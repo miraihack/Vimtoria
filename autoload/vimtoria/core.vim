@@ -46,6 +46,11 @@ function! vimtoria#core#state() abort
   return s:state
 endfunction
 
+" ゲーム状態が存在するか(autocmd からの再初期化を防ぐガード)
+function! vimtoria#core#running() abort
+  return !empty(s:state)
+endfunction
+
 function! vimtoria#core#start() abort
   if !empty(s:state) && vimtoria#ui#focus_existing()
     call vimtoria#ui#render()
@@ -60,8 +65,10 @@ function! vimtoria#core#start() abort
     let s:state.screen = 'select'
   endif
   call vimtoria#ui#open()
-  " 国が既に決まっている場合は、起動直後にブリーフィングを表示する
+  " 国が既に決まっている場合は、首都を中央にしてブリーフィングを表示する
   if s:state.screen ==# 'map'
+    call vimtoria#ui#center_map()
+    call vimtoria#ui#render()
     call vimtoria#popup#briefing(vimtoria#ui#bufnr(), s:state)
   endif
 endfunction
@@ -144,7 +151,9 @@ function! vimtoria#core#action(name) abort
       let l:st.menu_idx = 0
       let l:st.msg = printf(vimtoria#i18n#t('msg_play_start'),
             \ vimtoria#i18n#name(l:map.countries[l:cid]))
-      " 描画の後で、その国の置かれている状況をブリーフィング表示する
+      " 首都を画面中央にし、その国の置かれている状況をブリーフィング表示する
+      call vimtoria#ui#render()
+      call vimtoria#ui#center_map()
       call vimtoria#ui#render()
       call vimtoria#popup#briefing(vimtoria#ui#bufnr(), l:st)
       return

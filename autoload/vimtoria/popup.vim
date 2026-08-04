@@ -10,6 +10,24 @@ scriptencoding utf-8
 
 let s:enabled = -1        " -1: 未初期化(g:vimtoria_popup から読む)
 let s:slots = {}          " key -> {'vim': popup id, 'win': nvim win, 'buf': nvim buf}
+let s:view = {'leftcol': 0, 'width': 200}
+
+" ゲームウィンドウのスクロール位置と幅を取り込む(win_execute 経由)
+function! vimtoria#popup#_capture() abort
+  let s:view = {'leftcol': winsaveview().leftcol, 'width': winwidth(0)}
+endfunction
+
+" ラベル位置(地図 1 周目)を、いま見えている側の世界コピーへ写す。
+" 地図バッファには世界が 2 周分描かれているため、左端より西のラベルは
+" 2 周目のコピー上に見えている
+function! s:eff_anchor(pos) abort
+  if a:pos[3] < s:view.leftcol
+    let l:rb = vimtoria#screens#map#row_bytes(a:pos[0])
+    return [a:pos[0], a:pos[1] + l:rb, a:pos[2] + l:rb,
+          \ a:pos[3] + 200, a:pos[4] + 200]
+  endif
+  return a:pos
+endfunction
 
 function! s:init_enabled() abort
   if s:enabled == -1
@@ -65,12 +83,14 @@ function! vimtoria#popup#update(bufnr, st) abort
     call vimtoria#popup#hide()
     return
   endif
-  " 選択中の州の所有国(ラベルの脇)
+  call win_execute(l:winid, 'call vimtoria#popup#_capture()')
+  " 選択中の州の所有国(ラベルの脇。右端寄りなら左側へ出す)
   let l:pos = vimtoria#screens#map#label_pos(a:st.selected)
   if empty(l:pos)
     call s:hide('sel')
   else
-    let l:left = l:pos[4] <= 150
+    let l:pos = s:eff_anchor(l:pos)
+    let l:left = l:pos[4] - s:view.leftcol <= s:view.width - 45
     call s:show('sel', l:winid, l:pos[0] + 4,
           \ l:left ? l:pos[2] : l:pos[1], l:left,
           \ vimtoria#popup#country(a:st, a:st.world.owner[a:st.selected]))
@@ -80,13 +100,15 @@ function! vimtoria#popup#update(bufnr, st) abort
   if empty(l:haw)
     call s:hide('own')
   else
+    let l:haw = s:eff_anchor(l:haw)
     call s:show('own', l:winid, l:haw[0] + 4 + 2,
-          \ l:haw[1] > 4 ? l:haw[1] - 4 : 0, 1,
+          \ l:haw[1] > 4 ? l:haw[1] - 4 : l:haw[1], 1,
           \ vimtoria#popup#country(a:st, a:st.country))
   endif
 endfunction
 
-" 国選択直後の情勢解説を画面中央付近に出す(次のキー入力で閉じる)
+" 国選択直後の情勢解説をウィンドウ中央に出す(次のキー入力で閉じる)。
+" バッファ位置でなくウィンドウ位置に置くので、地図のスクロールと無関係
 function! vimtoria#popup#briefing(bufnr, st) abort
   if !vimtoria#popup#supported()
     return
@@ -95,8 +117,52 @@ function! vimtoria#popup#briefing(bufnr, st) abort
   if l:winid == -1
     return
   endif
-  call s:show('brief', l:winid, 6, 30, 1,
+  call s:show_win_centered('brief', l:winid, 4,
         \ vimtoria#popup#brief_lines(a:st, a:st.country))
+endfunction
+
+" ウィンドウ相対で水平中央に表示する(ブリーフィング用)
+function! s:show_win_centered(key, winid, row, lines) abort
+  if !has_key(s:slots, a:key)
+    let s:slots[a:key] = {'vim': 0, 'win': -1, 'buf': -1}
+  endif
+  let l:s = s:slots[a:key]
+  let l:w = 0
+  for l:line in a:lines
+    let l:dw = strdisplaywidth(l:line)
+    if l:dw > l:w
+      let l:w = l:dw
+    endif
+  endfor
+  let l:col = (winwidth(a:winid) - l:w) / 2
+  if l:col < 0
+    let l:col = 0
+  endif
+  if has('nvim')
+    if l:s.buf == -1 || !bufexists(l:s.buf)
+      let l:s.buf = nvim_create_buf(v:false, v:true)
+    endif
+    call nvim_buf_set_lines(l:s.buf, 0, -1, v:false, a:lines)
+    let l:conf = {'relative': 'win', 'win': a:winid,
+          \ 'row': a:row, 'col': l:col, 'anchor': 'NW',
+          \ 'width': l:w, 'height': len(a:lines),
+          \ 'style': 'minimal', 'focusable': v:false, 'zindex': 60}
+    if l:s.win != -1 && nvim_win_is_valid(l:s.win)
+      call nvim_win_set_config(l:s.win, l:conf)
+    else
+      let l:s.win = nvim_open_win(l:s.buf, v:false, l:conf)
+    endif
+  else
+    let l:wp = win_screenpos(a:winid)
+    let l:opts = {'line': l:wp[0] + a:row, 'col': l:wp[1] + l:col,
+          \ 'pos': 'topleft', 'zindex': 60, 'wrap': 0}
+    if l:s.vim != 0 && !empty(popup_getpos(l:s.vim))
+      call popup_settext(l:s.vim, a:lines)
+      call popup_move(l:s.vim, l:opts)
+    else
+      let l:s.vim = popup_create(a:lines, l:opts)
+    endif
+  endif
 endfunction
 
 function! vimtoria#popup#dismiss_brief() abort
