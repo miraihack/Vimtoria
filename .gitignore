@@ -1,1 +1,2 @@
-test/results.txt
+__pycache__/
+*.pyc
