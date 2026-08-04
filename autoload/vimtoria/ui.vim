@@ -397,6 +397,10 @@ function! s:set_keymaps() abort
     execute printf('nnoremap <buffer> <silent> <nowait> %s :<C-u>call vimtoria#core#action(%s)<CR>',
           \ l:key, string(l:act))
   endfor
+  " g 単独のフォールバック: 2 キーマッピングの待ちがタイマー再描画で
+  " 中断されて g だけが解決された場合でも、2 キー目を getchar() で
+  " 読んで画面切替を成立させる(gc を 2 回押す必要が出る問題の対策)
+  nnoremap <buffer> <silent> g :<C-u>call vimtoria#core#gkey()<CR>
   " マウス: マップ上のクリックで州を選択
   nnoremap <buffer> <silent> <LeftMouse> :<C-u>call vimtoria#core#click()<CR>
   nnoremap <buffer> <silent> <2-LeftMouse> :<C-u>call vimtoria#core#click()<CR>

@@ -283,6 +283,23 @@ function! vimtoria#core#action(name) abort
   call vimtoria#ui#render()
 endfunction
 
+" g プレフィックスの画面切替(gm/gb/gc/gt/gp/gr/gv/gd/ga)。
+" 2 キー目は getchar() で同期的に読む。通常の 2 キーマッピングだと、
+" タイマー駆動の再描画が g と 2 キー目の間に挟まったときに
+" マッピング待ちが中断され、gc などを 2 回押す必要が出るため
+function! vimtoria#core#gkey() abort
+  let l:c = getchar()
+  let l:key = type(l:c) == v:t_number ? nr2char(l:c) : l:c
+  let l:screens = {'m': 'screen_market', 'b': 'screen_budget',
+        \ 'c': 'screen_construction', 't': 'screen_tech',
+        \ 'p': 'screen_pops', 'r': 'screen_ranking',
+        \ 'v': 'screen_politics', 'd': 'screen_diplo',
+        \ 'a': 'screen_military'}
+  if has_key(l:screens, l:key)
+    call vimtoria#core#action(l:screens[l:key])
+  endif
+endfunction
+
 function! s:save_file() abort
   return expand(get(g:, 'vimtoria_save_file', '~/.vimtoria_save.json'))
 endfunction
