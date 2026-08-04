@@ -1,5 +1,9 @@
 scriptencoding utf-8
 " screens/select.vim - ゲーム開始時の国選択画面
+" j/k のメニュー選択に加え、カーソルを国の行に置いて Enter(または
+" クリック)でもその国を選べる。国行の開始位置を描画時に記録する。
+
+let s:row0 = -1   " 国リスト先頭のバッファ行番号(未描画なら -1)
 
 function! vimtoria#screens#select#render(st) abort
   let l:map = vimtoria#data#map()
@@ -20,6 +24,8 @@ function! vimtoria#screens#select#render(st) abort
         \          vimtoria#i18n#t('sl_col_army'),
         \          vimtoria#i18n#t('sl_col_econ')))
   call add(l:lines, '  ' . repeat('─', 78))
+  " 国行の開始バッファ行を記録(ui がヘッダ等 3 行を前置するので +4)
+  let s:row0 = len(l:lines) + 4
   let l:i = 0
   for l:cid in l:map.country_order
     let l:pop = 0
@@ -44,4 +50,14 @@ function! vimtoria#screens#select#render(st) abort
   call add(l:lines, '')
   call add(l:lines, vimtoria#i18n#t('sl_note'))
   return l:lines
+endfunction
+
+" バッファ行番号 → 国リストの添字(国の行でなければ -1)
+function! vimtoria#screens#select#index_at(lnum) abort
+  if s:row0 < 0
+    return -1
+  endif
+  let l:idx = a:lnum - s:row0
+  return l:idx >= 0 && l:idx < len(vimtoria#data#map().country_order)
+        \ ? l:idx : -1
 endfunction

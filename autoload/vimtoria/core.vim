@@ -142,7 +142,13 @@ function! vimtoria#core#action(name) abort
       let l:st.screen = exists('g:vimtoria_player_country') ? 'map' : 'select'
       let l:st.menu_idx = 0
     elseif l:st.screen ==# 'select'
-      " プレイする国を決定
+      " プレイする国を決定。カーソルが国の行にあればその国を優先する
+      if bufname('%') ==# 'vimtoria://game'
+        let l:ci = vimtoria#screens#select#index_at(line('.'))
+        if l:ci >= 0
+          let l:st.menu_idx = l:ci
+        endif
+      endif
       let l:map = vimtoria#data#map()
       let l:cid = l:map.country_order[l:st.menu_idx]
       let l:st.country = l:cid
@@ -316,7 +322,19 @@ endfunction
 function! vimtoria#core#click() abort
   let l:st = vimtoria#core#state()
   let l:pos = getmousepos()
-  if l:pos.winid == 0 || l:pos.line <= 0 || l:st.screen !=# 'map'
+  if l:pos.winid == 0 || l:pos.line <= 0
+    return
+  endif
+  " 国選択画面: クリックした行の国を選択(Enter で決定)
+  if l:st.screen ==# 'select'
+    let l:ci = vimtoria#screens#select#index_at(l:pos.line)
+    if l:ci >= 0
+      let l:st.menu_idx = l:ci
+      call vimtoria#ui#render()
+    endif
+    return
+  endif
+  if l:st.screen !=# 'map'
     return
   endif
   " マップは ヘッダ・ヒント・空行 の 3 行の下(バッファ 4 行目)から始まる
