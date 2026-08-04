@@ -54,7 +54,13 @@ function! vimtoria#econ#init(state) abort
       let l:world.markets[l:cid][l:gid] =
             \ {'price': l:eco.goods[l:gid].base, 'buy': 0.0, 'sell': 0.0}
     endfor
-    let l:world.treasuries[l:cid] = 10000.0
+    " 初期国庫は国の規模(労働力)に比例。開始直後に枯渇しないための緩衝
+    let l:cwf = 0.0
+    for l:sid in l:map.country_states[l:cid]
+      let l:cwf += l:world.workforce[l:sid]
+    endfor
+    let l:world.treasuries[l:cid] = l:eco.const.init_treasury_base
+          \ + l:eco.const.init_treasury_per_k * l:cwf
     let l:world.queues[l:cid] = []
     let l:world.tax_rates[l:cid] = l:eco.const.tax_rate
     let l:world.stats[l:cid] = {'gdp': 0.0, 'income': 0.0, 'sol': 1.0,

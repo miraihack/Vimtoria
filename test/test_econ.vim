@@ -64,13 +64,16 @@ function! s:check_invariants(st, label) abort
 endfunction
 
 " ---- 1 tick ----
+" 初期国庫は規模比例(base + per_k × 労働力)
+let s:t0 = s:st.world.treasuries['JAP']
+call assert_true(s:t0 > 10000.0, '初期国庫が規模に比例していない')
 call vimtoria#econ#tick(s:st)
 call s:check_invariants(s:st, '1週目')
 " 国庫の収支が一致する
-" (初期 10000 + 税収 + 関税 - 維持費 - 軍事費 - 利払い - 建設支出)
+" (初期国庫 + 税収 + 関税 - 維持費 - 軍事費 - 利払い - 建設支出)
 let s:jap = s:st.world.stats['JAP']
 call assert_true(abs(s:st.world.treasuries['JAP']
-      \ - (10000.0 + s:jap.tax + s:jap.tariff - s:jap.upkeep - s:jap.mil
+      \ - (s:t0 + s:jap.tax + s:jap.tariff - s:jap.upkeep - s:jap.mil
       \    - s:jap.interest - s:jap.spend)) < 0.01,
       \ '国庫の収支が合わない')
 call assert_true(s:jap.tax > 0.0, '税収がない')

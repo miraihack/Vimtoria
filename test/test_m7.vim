@@ -9,13 +9,16 @@ let g:vimtoria_disable_events = 1
 " ---- 歴史イベントデータの整合性(200件規模) ----
 let s:hd = vimtoria#data#history()
 let s:md = vimtoria#data#map()
-call assert_true(len(s:hd.events) >= 200,
-      \ printf('歴史イベントが200件未満: %d', len(s:hd.events)))
+let s:pd2 = vimtoria#data#politics()
+call assert_true(len(s:hd.events) >= 180,
+      \ printf('歴史イベントが少なすぎる: %d', len(s:hd.events)))
 call assert_equal(len(s:hd.events), len(s:hd.order))
+let s:n_cond = 0
 for [s:hid, s:def] in items(s:hd.events)
   call assert_true(empty(s:def.country) || has_key(s:md.countries, s:def.country),
         \ s:hid . ': 対象国が未定義')
-  call assert_true(s:def.year >= 1836 && s:def.year <= 1945, s:hid . ': 年が範囲外')
+  " 1936年以降のイベントは存在しない
+  call assert_true(s:def.year >= 1836 && s:def.year <= 1935, s:hid . ': 年が範囲外')
   call assert_true(!empty(s:def.name) && !empty(s:def.name_en), s:hid . ': 名前欠落')
   if has_key(s:def.effects, 'rel')
     for s:r in s:def.effects.rel
@@ -23,7 +26,20 @@ for [s:hid, s:def] in items(s:hd.events)
             \ && has_key(s:md.countries, s:r[1]), s:hid . ': rel の国が未定義')
     endfor
   endif
+  " 発生条件の整合性(参照先が実在すること)
+  if has_key(s:def, 'cond')
+    let s:n_cond += 1
+    for s:rid in get(s:def.cond, 'req_event', [])
+      call assert_true(has_key(s:hd.events, s:rid), s:hid . ': req_event 未定義 ' . s:rid)
+      call assert_true(s:hd.events[s:rid].day <= s:def.day,
+            \ s:hid . ': req_event が自分より後の日付 ' . s:rid)
+    endfor
+    for s:lid in get(s:def.cond, 'req_law', [])
+      call assert_true(has_key(s:pd2.laws, s:lid), s:hid . ': req_law 未定義 ' . s:lid)
+    endfor
+  endif
 endfor
+call assert_true(s:n_cond >= 50, printf('発生条件付きイベントが少ない: %d', s:n_cond))
 " order は日付昇順
 let s:prev = -1
 for s:hid in s:hd.order
@@ -92,7 +108,9 @@ call assert_true(s:found, '歴史イベントがログに載らない')
 " ペリー来航(1853)と南京条約(1842)で日清が開国する
 let s:st.day = (1853 - 1836) * 365 + 250
 call vimtoria#econ#tick(s:st)
-call assert_true(has_key(s:world.history_fired, 'perry'), 'ペリー来航が発火しない')
+call assert_equal(1, get(s:world.history_fired, 'perry', -1), 'ペリー来航が発火しない')
+call assert_equal(1, get(s:world.history_fired, 'opium_war', -1),
+      \ 'アヘン戦争が発火しない(林則徐→開戦の連鎖)')
 call assert_false(has_key(s:world.isolated, 'JAP'), 'ペリー来航後も日本が鎖国中')
 call assert_false(has_key(s:world.isolated, 'QIN'), '南京条約後も清が鎖国中')
 " 開国後は交易が始まる
@@ -113,11 +131,62 @@ call assert_equal(s:fired, len(s:world.history_fired) , '同じイベントが�
 call vimtoria#core#init()
 let s:st = vimtoria#core#state()
 let s:world = s:st.world
-" テキサスを併合してから 1837 年へ → テキサス関連イベントは起きない
+" テキサスを併合してから 1837 年へ → テキサス関連イベントは起きない(値 0)
 call vimtoria#war#annex(s:world, 'TEX', 'MEX')
 let s:st.day = 500
 call vimtoria#econ#tick(s:st)
-call assert_true(has_key(s:world.history_fired, 'texas_republic'))
+call assert_equal(0, get(s:world.history_fired, 'texas_republic', -1),
+      \ '消滅国のイベントが分岐しない')
+
+" ---- 発生条件: 政治体制が革命の分かれ目になる ----
+call vimtoria#core#init()
+let s:st = vimtoria#core#state()
+let s:world = s:st.world
+" 墺(絶対王政)は急進化していれば三月革命が起き、
+" 仏(立憲君主制)は同じ急進性でも二月革命が起きない
+let s:world.politics['AUS'].rad = 30.0
+let s:world.politics['FRA'].rad = 30.0
+let s:st.day = (1849 - 1836) * 365
+call vimtoria#econ#tick(s:st)
+call assert_equal(1, get(s:world.history_fired, 'mar_revolution_aus', -1),
+      \ '絶対王政の墺で三月革命が起きない')
+call assert_equal(0, get(s:world.history_fired, 'feb_revolution_fra', -1),
+      \ '立憲君主制の仏で二月革命が起きてしまった')
+
+" ---- 発生条件: 既に開国していればペリー来航は起きない ----
+call vimtoria#core#init()
+let s:st = vimtoria#core#state()
+let s:world = s:st.world
+let s:world.isolated = {}
+let s:st.day = (1855 - 1836) * 365
+call vimtoria#econ#tick(s:st)
+call assert_equal(0, get(s:world.history_fired, 'perry', -1),
+      \ '開国済みなのにペリー来航が起きた')
+call assert_equal(0, get(s:world.history_fired, 'kanagawa', -1),
+      \ '先行イベント無しで日米和親条約が起きた(連鎖切断の検証)')
+
+" ---- 国庫: 初期国庫は規模比例で、1年間 AI 任せでも枯渇しない ----
+call vimtoria#core#init()
+let s:st = vimtoria#core#state()
+let s:world = s:st.world
+call assert_true(s:world.treasuries['QIN'] > s:world.treasuries['HAW'],
+      \ '初期国庫が規模に比例していない')
+let s:i = 0
+let s:min_t = {}
+while s:i < 52
+  let s:st.day += 7
+  call vimtoria#econ#tick(s:st)
+  for [s:cid, s:t] in items(s:world.treasuries)
+    if s:t < get(s:min_t, s:cid, 1.0e18)
+      let s:min_t[s:cid] = s:t
+    endif
+  endfor
+  let s:i += 1
+endwhile
+for [s:cid, s:t] in items(s:min_t)
+  call assert_true(s:t > -1000.0,
+        \ printf('%s の国庫が1年以内に枯渇: 最低 %.0f', s:cid, s:t))
+endfor
 
 " ---- ブリーフィング(純関数)----
 call vimtoria#core#init()

@@ -32,11 +32,12 @@ function! vimtoria#core#init() abort
         \ 'screen_arg': '',
         \ 'selected': l:data.countries[l:player].capital,
         \ 'country': l:player,
-        \ 'treasury': 10000,
+        \ 'treasury': 0,
         \ 'menu_idx': 0,
         \ 'msg': '',
         \ }
   call vimtoria#econ#init(s:state)
+  let s:state.treasury = float2nr(s:state.world.treasuries[l:player])
 endfunction
 
 function! vimtoria#core#state() abort

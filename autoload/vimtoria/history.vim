@@ -26,18 +26,77 @@ function! vimtoria#history#tick(world, day, player) abort
     if has_key(a:world.history_fired, l:hid)
       continue
     endif
-    let a:world.history_fired[l:hid] = 1
-    call s:fire(a:world, l:hid, a:day)
+    " 1 = 発生した / 0 = 条件を満たさず歴史が分岐した(再判定しない)
+    let a:world.history_fired[l:hid] = s:fire(a:world, l:hid, a:day)
   endfor
+endfunction
+
+" イベントの発生条件(def.cond)を判定する。条件は史実の日付の時点で
+" 一度だけ評価され、満たされなければそのイベントは起きない(歴史の分岐)
+function! s:cond_met(world, def) abort
+  let l:cid = a:def.country
+  " 対象国が消滅していれば起きない
+  if !empty(l:cid) && empty(a:world.country_states[l:cid])
+    return 0
+  endif
+  let l:c = get(a:def, 'cond', {})
+  if empty(l:c)
+    return 1
+  endif
+  " 先行イベント(すべて発生済みであること)
+  for l:hid in get(l:c, 'req_event', [])
+    if get(a:world.history_fired, l:hid, 0) != 1
+      return 0
+    endif
+  endfor
+  " 鎖国している / していること
+  if get(l:c, 'req_isolated', 0) && !get(a:world.isolated, l:cid, 0)
+    return 0
+  endif
+  if get(l:c, 'req_open', 0) && get(a:world.isolated, l:cid, 0)
+    return 0
+  endif
+  " 政治体制など: 挙げた法律のどれかが施行中であること(OR)
+  if has_key(l:c, 'req_law')
+    let l:pd = vimtoria#data#politics()
+    let l:hitlaw = 0
+    for l:lid in l:c.req_law
+      if a:world.politics[l:cid].laws[l:pd.laws[l:lid].group] ==# l:lid
+        let l:hitlaw = 1
+        break
+      endif
+    endfor
+    if !l:hitlaw
+      return 0
+    endif
+  endif
+  " 急進性の下限(革命・騒乱系)
+  if has_key(l:c, 'min_rad') && a:world.politics[l:cid].rad < l:c.min_rad
+    return 0
+  endif
+  " 二国間関係の上限(対立が存在していること)
+  if has_key(l:c, 'req_rel_max')
+    let l:r = l:c.req_rel_max
+    if empty(a:world.country_states[l:r[0]])
+          \ || empty(a:world.country_states[l:r[1]])
+          \ || vimtoria#diplo#relation(a:world, l:r[0], l:r[1]) > l:r[2]
+      return 0
+    endif
+  endif
+  " 州の所有(アラスカ売却など)
+  if has_key(l:c, 'req_owner')
+        \ && a:world.owner[l:c.req_owner[0]] !=# l:c.req_owner[1]
+    return 0
+  endif
+  return 1
 endfunction
 
 function! s:fire(world, hid, day) abort
   let l:def = vimtoria#data#history().events[a:hid]
-  let l:cid = l:def.country
-  " 対象国が消滅していれば歴史は分岐した — 何も起きない
-  if !empty(l:cid) && empty(a:world.country_states[l:cid])
-    return
+  if !s:cond_met(a:world, l:def)
+    return 0
   endif
+  let l:cid = l:def.country
   let l:fx = l:def.effects
   if !empty(l:cid)
     " 開国
@@ -100,4 +159,5 @@ function! s:fire(world, hid, day) abort
   " 世界ニュースとして全プレイヤーのログに載せる
   call vimtoria#war#log(a:world, a:day, printf(vimtoria#i18n#t('log_history'),
         \ vimtoria#i18n#name(l:def), vimtoria#i18n#desc(l:def)))
+  return 1
 endfunction
