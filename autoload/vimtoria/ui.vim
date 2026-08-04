@@ -6,6 +6,8 @@ scriptencoding utf-8
 let s:bufnr = -1
 let s:match_sig = ''
 let s:saved_mouse = v:null
+let s:last_screen = ''
+let s:map_view = {}
 
 function! vimtoria#ui#screen_name(screen) abort
   return vimtoria#i18n#t('scr_' . a:screen)
@@ -38,6 +40,8 @@ function! vimtoria#ui#open() abort
   " マップのクリック選択のためにマウスを有効化(終了時に復元する)
   let s:saved_mouse = &mouse
   set mouse=a
+  let s:last_screen = ''
+  let s:map_view = {}
   call s:set_keymaps()
   call vimtoria#ui#apply_matches()
   let s:match_sig = s:matches_sig(vimtoria#core#state())
@@ -48,6 +52,16 @@ function! vimtoria#ui#open() abort
           \ | call vimtoria#core#shutdown()
   augroup END
   call vimtoria#ui#render()
+endfunction
+
+function! vimtoria#ui#save_map_view() abort
+  let s:map_view = winsaveview()
+endfunction
+
+function! vimtoria#ui#restore_map_view() abort
+  if !empty(s:map_view)
+    call winrestview(s:map_view)
+  endif
 endfunction
 
 function! vimtoria#ui#restore_mouse() abort
@@ -82,11 +96,30 @@ function! vimtoria#ui#render() abort
     call win_execute(bufwinid(s:bufnr), 'call vimtoria#ui#apply_matches()')
     let s:match_sig = l:sig
   endif
+  " 画面の切り替え時にスクロール位置を整える。地図は横 200 桁あるので、
+  " 右へスクロールしたままサブ画面を開くと画面が見切れてしまう。
+  " 地図 → サブ画面: 地図の表示位置を保存して左上へリセット
+  " サブ画面 → 地図: 保存しておいた表示位置に戻す
+  " (保存はバッファを書き換える前に行う。書き換えで leftcol が失われるため)
+  let l:screen_changed = l:st.screen !=# s:last_screen
+  if l:screen_changed && s:last_screen ==# 'map'
+    call win_execute(bufwinid(s:bufnr), 'call vimtoria#ui#save_map_view()')
+  endif
   let l:lines = vimtoria#ui#build_lines(l:st)
   call setbufvar(s:bufnr, '&modifiable', 1)
   call setbufline(s:bufnr, 1, l:lines)
   silent! call deletebufline(s:bufnr, len(l:lines) + 1, '$')
   call setbufvar(s:bufnr, '&modifiable', 0)
+  if l:screen_changed
+    let l:winid = bufwinid(s:bufnr)
+    if l:st.screen ==# 'map'
+      call win_execute(l:winid, 'call vimtoria#ui#restore_map_view()')
+    else
+      call win_execute(l:winid,
+            \ 'call winrestview({"lnum": 1, "col": 0, "leftcol": 0, "topline": 1})')
+    endif
+    let s:last_screen = l:st.screen
+  endif
   " メニュー画面ではカーソルを選択行(> 印)へ移す。技術ツリーのような
   " 画面より長いリストでも、Vim のスクロールで選択行が常に見える
   if l:st.screen !=# 'map'
