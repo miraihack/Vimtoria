@@ -67,6 +67,12 @@ let s:T = {
       \               ' VIMTORIA ┃ %s ┃ %s ┃ Treasury £%s ┃ %s'],
       \ 'hdr_paused': ['❚❚ 停止中', '❚❚ PAUSED'],
       \ 'hdr_speed':  [' 速度%d', ' speed %d'],
+      \ 'hdr_hour':   [' %2d時', ' %02d:00'],
+      \ 'msg_popup_sel_off': ['他国の概況を隠しました(もう一度 ESC で自国も隠す)',
+      \                      'Hid the country overview (ESC again hides your own)'],
+      \ 'msg_popup_own_off': ['自国の概況も隠しました(ESC で両方戻す)',
+      \                      'Hid your own overview too (ESC restores both)'],
+      \ 'msg_popup_on':      ['概況ポップアップを再表示しました', 'Overview popups restored'],
       \
       \ 'hint_map': [' Space:停止 1-4:速度 hjkl/クリック:州選択 Enter:カーソル位置/選択中の州の詳細 v:各国情報'
       \   . ' gm:市場 gb:予算 gc:建設 gt:技術 gv:政治 gd:外交 ga:軍事 gp:Pop gr:列強 S/L:セーブ/ロード q:終了',

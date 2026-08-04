@@ -12,13 +12,22 @@ call assert_equal({'year': 1836, 'month': 12, 'day': 31}, vimtoria#core#date(364
 call assert_equal({'year': 1837, 'month': 1, 'day': 1}, vimtoria#core#date(365))
 call assert_equal({'year': 1936, 'month': 1, 'day': 1}, vimtoria#core#date(36500))
 
-" ---- tick で 1 週間進む ----
+" ---- tick は 1 時間ずつ進み、168 時間(1週間)ごとに経済が回る ----
 call vimtoria#core#init()
 call assert_equal(0, vimtoria#core#state().day)
+call assert_equal(0, vimtoria#core#state().hour)
+let s:i = 0
+while s:i < 168
+  call vimtoria#core#tick()
+  let s:i += 1
+endwhile
+call assert_equal(7, vimtoria#core#state().day)
+call assert_equal(0, vimtoria#core#state().hour)
+call assert_true(vimtoria#core#state().world.stats['JAP'].gdp > 0.0,
+      \ '週の境界で経済が回っていない')
 call vimtoria#core#tick()
 call assert_equal(7, vimtoria#core#state().day)
-call vimtoria#core#tick()
-call assert_equal(14, vimtoria#core#state().day)
+call assert_equal(1, vimtoria#core#state().hour)
 
 " ---- マップデータの整合性 ----
 let s:data = vimtoria#data#map()
@@ -120,7 +129,9 @@ call assert_equal('JAP', vimtoria#core#state().country)
 call assert_equal('EDO', vimtoria#core#state().selected)
 call vimtoria#core#action('speed_3')
 call assert_equal(3, vimtoria#core#state().speed)
-call assert_equal(500, vimtoria#core#speed_ms(3))
+" 速度は 1 時間あたりのミリ秒。最速でも 1 週間 ≈ 10 秒のスローペース
+call assert_equal(200, vimtoria#core#speed_ms(3))
+call assert_true(vimtoria#core#speed_ms(4) >= 60, '最速が速すぎる')
 
 call vimtoria#core#action('nav_l')
 call assert_notequal('', vimtoria#core#state().selected)

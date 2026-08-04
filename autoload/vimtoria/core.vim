@@ -7,8 +7,9 @@ let s:MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 let s:MONTH_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       \ 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 let s:START_YEAR = 1836
-" 速度 → 1ティック(=ゲーム内1週間)のミリ秒
-let s:SPEED_MS = {1: 2000, 2: 1000, 3: 500, 4: 250}
+" 速度 → 1ティック(=ゲーム内1時間)のミリ秒。時計は1時間ずつ進み、
+" 経済・政治などの計算は従来どおり週次(168時間ごと)にまとめて回る
+let s:SPEED_MS = {1: 1000, 2: 500, 3: 200, 4: 60}
 
 " 選択系画面(時間停止・操作制限)と、そこで許可するアクション
 let s:PICKER_SCREENS = ['select', 'lang']
@@ -26,6 +27,7 @@ function! vimtoria#core#init() abort
   endif
   let s:state = {
         \ 'day': 0,
+        \ 'hour': 0,
         \ 'paused': 1,
         \ 'speed': 2,
         \ 'screen': 'map',
@@ -74,10 +76,15 @@ function! vimtoria#core#start() abort
   endif
 endfunction
 
-" 1ティック = ゲーム内1週間
+" 1ティック = ゲーム内1時間。24時間で日付が進み、7日ごとに経済が回る
 function! vimtoria#core#tick() abort
-  let s:state.day += 7
-  call vimtoria#econ#tick(s:state)
+  let s:state.hour = (get(s:state, 'hour', 0) + 1) % 24
+  if s:state.hour == 0
+    let s:state.day += 1
+    if s:state.day % 7 == 0
+      call vimtoria#econ#tick(s:state)
+    endif
+  endif
   call vimtoria#ui#render()
 endfunction
 
@@ -114,7 +121,7 @@ function! vimtoria#core#action(name) abort
     return
   endif
   " ブリーフィング表示中なら、どのキーでも閉じる
-  call vimtoria#popup#dismiss_brief()
+  let l:brief_closed = vimtoria#popup#dismiss_brief()
   let l:st.msg = ''
   if a:name ==# 'pause'
     let l:st.paused = !l:st.paused
@@ -264,10 +271,13 @@ function! vimtoria#core#action(name) abort
     let l:st.screen = 'map'
     let l:st.screen_arg = ''
   elseif a:name ==# 'to_map'
-    " ESC: どのサブ画面からでも世界地図へ(マップ上では何もしない)
+    " ESC: サブ画面からは世界地図へ。地図上では概況ポップアップを
+    " 1回目=他国、2回目=自国 の順で隠し、3回目で両方戻す
     if l:st.screen !=# 'map'
       let l:st.screen = 'map'
       let l:st.screen_arg = ''
+    elseif !l:brief_closed
+      let l:st.msg = vimtoria#i18n#t(vimtoria#popup#esc_cycle())
     endif
   endif
   call vimtoria#ui#render()
@@ -309,6 +319,9 @@ function! vimtoria#core#load() abort
     return 0
   endif
   let s:state = l:data.state
+  if !has_key(s:state, 'hour')
+    let s:state.hour = 0
+  endif
   let s:state.paused = 1
   let s:state.screen = 'map'
   let s:state.msg = printf(vimtoria#i18n#t('msg_loaded'),

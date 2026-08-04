@@ -335,7 +335,8 @@ function! s:header_line(st) abort
           \ . printf(vimtoria#i18n#t('hdr_speed'), a:st.speed)
   endif
   return printf(vimtoria#i18n#t('hdr_fmt'),
-        \ vimtoria#core#date_str(a:st.day),
+        \ vimtoria#core#date_str(a:st.day)
+        \   . printf(vimtoria#i18n#t('hdr_hour'), get(a:st, 'hour', 0)),
         \ l:speed,
         \ s:fmt_num(a:st.treasury),
         \ vimtoria#ui#screen_name(a:st.screen))

@@ -11,6 +11,9 @@ scriptencoding utf-8
 let s:enabled = -1        " -1: 未初期化(g:vimtoria_popup から読む)
 let s:slots = {}          " key -> {'vim': popup id, 'win': nvim win, 'buf': nvim buf}
 let s:view = {'leftcol': 0, 'width': 200}
+" 地図上の ESC で個別に隠せる(1回目=他国 sel、2回目=自国 own、3回目で復帰)
+let s:sel_on = 1
+let s:own_on = 1
 
 " ゲームウィンドウのスクロール位置と幅を取り込む(win_execute 経由)
 function! vimtoria#popup#_capture() abort
@@ -54,20 +57,42 @@ function! vimtoria#popup#hide() abort
   endfor
 endfunction
 
+" スロットを閉じる。実際に表示中のものを閉じたら 1 を返す
 function! s:hide(key) abort
   if !has_key(s:slots, a:key)
-    return
+    return 0
   endif
   let l:s = s:slots[a:key]
+  let l:closed = 0
   if has('nvim')
     if l:s.win != -1
+      let l:closed = nvim_win_is_valid(l:s.win)
       silent! call nvim_win_close(l:s.win, v:true)
       let l:s.win = -1
     endif
   elseif l:s.vim != 0
+    let l:closed = !empty(popup_getpos(l:s.vim))
     silent! call popup_close(l:s.vim)
     let l:s.vim = 0
   endif
+  return l:closed
+endfunction
+
+" 地図上の ESC: 他国 → 自国 → 両方復帰 の順に切り替える。
+" 表示したメッセージの i18n キーを返す
+function! vimtoria#popup#esc_cycle() abort
+  if s:sel_on
+    let s:sel_on = 0
+    call s:hide('sel')
+    return 'msg_popup_sel_off'
+  elseif s:own_on
+    let s:own_on = 0
+    call s:hide('own')
+    return 'msg_popup_own_off'
+  endif
+  let s:sel_on = 1
+  let s:own_on = 1
+  return 'msg_popup_on'
 endfunction
 
 " 地図の描画後に ui.vim から呼ばれる
@@ -85,7 +110,7 @@ function! vimtoria#popup#update(bufnr, st) abort
   endif
   call win_execute(l:winid, 'call vimtoria#popup#_capture()')
   " 選択中の州の所有国(ラベルの脇。右端寄りなら左側へ出す)
-  let l:pos = vimtoria#screens#map#label_pos(a:st.selected)
+  let l:pos = s:sel_on ? vimtoria#screens#map#label_pos(a:st.selected) : []
   if empty(l:pos)
     call s:hide('sel')
   else
@@ -96,7 +121,7 @@ function! vimtoria#popup#update(bufnr, st) abort
           \ vimtoria#popup#country(a:st, a:st.world.owner[a:st.selected]))
   endif
   " 自国の概況(ハワイ南方の太平洋海域に常設)
-  let l:haw = vimtoria#screens#map#label_pos('HAW')
+  let l:haw = s:own_on ? vimtoria#screens#map#label_pos('HAW') : []
   if empty(l:haw)
     call s:hide('own')
   else
@@ -165,8 +190,9 @@ function! s:show_win_centered(key, winid, row, lines) abort
   endif
 endfunction
 
+" ブリーフィングを閉じる。実際に閉じたら 1 を返す
 function! vimtoria#popup#dismiss_brief() abort
-  call s:hide('brief')
+  return s:hide('brief')
 endfunction
 
 function! s:show(key, winid, lnum, bcol, left, lines) abort
