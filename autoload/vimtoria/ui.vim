@@ -9,8 +9,33 @@ let s:saved_mouse = v:null
 let s:last_screen = ''
 let s:map_view = {}
 let s:normalizing = 0
+let s:in_render = 0
+" 地図画面のヘッダ・フッタの字下げ量(= 現在の水平スクロール位置)。
+" 右へスクロールしても自国の情勢や歴史イベントが読めるように、
+" 固定行を常に見えている位置へ描き直す
+let s:cur_leftcol = 0
+let s:win_lc = 0
 " 地図 1 周分の表示幅(200 桁)。バッファには 2 周分描かれている
 let s:MAP_W = 200
+
+" 地図画面の固定行(ヘッダ・フッタ)の字下げ量
+function! vimtoria#ui#map_leftcol() abort
+  return s:cur_leftcol
+endfunction
+
+function! vimtoria#ui#_capture_lc() abort
+  let s:win_lc = winsaveview().leftcol
+endfunction
+
+function! s:win_leftcol() abort
+  let l:winid = s:bufnr == -1 ? -1 : bufwinid(s:bufnr)
+  if l:winid == -1
+    return 0
+  endif
+  let s:win_lc = 0
+  call win_execute(l:winid, 'call vimtoria#ui#_capture_lc()')
+  return s:win_lc
+endfunction
 
 function! vimtoria#ui#screen_name(screen) abort
   return vimtoria#i18n#t('scr_' . a:screen)
@@ -76,11 +101,19 @@ endfunction
 " 反対側のコピーへ leftcol とカーソルを 1 周分ずらす。ユーザーには
 " 継ぎ目が見えず、右(左)へスクロールし続けると地球を一周して戻る
 function! vimtoria#ui#on_scroll() abort
-  if s:normalizing || s:bufnr == -1 || bufwinid(s:bufnr) == -1
+  if s:in_render || s:normalizing || s:bufnr == -1 || bufwinid(s:bufnr) == -1
         \ || !vimtoria#core#running()
     return
   endif
   if vimtoria#core#state().screen !=# 'map'
+    return
+  endif
+  " 巻き戻しと固定行(ヘッダ・フッタ)の字下げ調整のため描き直す
+  call vimtoria#ui#render()
+endfunction
+
+function! s:normalize_scroll() abort
+  if s:normalizing || bufwinid(s:bufnr) == -1
     return
   endif
   let s:normalizing = 1
@@ -166,6 +199,18 @@ function! s:matches_sig(st) abort
 endfunction
 
 function! vimtoria#ui#render() abort
+  if s:in_render
+    return
+  endif
+  let s:in_render = 1
+  try
+    call s:render_impl()
+  finally
+    let s:in_render = 0
+  endtry
+endfunction
+
+function! s:render_impl() abort
   if s:bufnr == -1 || !bufexists(s:bufnr) || bufwinnr(s:bufnr) == -1
     return
   endif
@@ -183,6 +228,10 @@ function! vimtoria#ui#render() abort
   let l:screen_changed = l:st.screen !=# s:last_screen
   if l:screen_changed && s:last_screen ==# 'map'
     call win_execute(bufwinid(s:bufnr), 'call vimtoria#ui#save_map_view()')
+  endif
+  " 地図の固定行の字下げに使う現在の水平スクロール位置
+  if l:st.screen ==# 'map' && !l:screen_changed
+    let s:cur_leftcol = s:win_leftcol()
   endif
   let l:lines = vimtoria#ui#build_lines(l:st)
   call setbufvar(s:bufnr, '&modifiable', 1)
@@ -211,10 +260,19 @@ function! vimtoria#ui#render() abort
       endif
     endfor
   endif
-  " 世界地図では、端に達したスクロールを巻き戻してから
-  " 選択中の州の所有国の概況をポップアップ表示する
+  " 世界地図では、端に達したスクロールを巻き戻し、フッタの字下げが
+  " ビュー確定後の位置とずれていれば組み直してから、概況を表示する
   if l:st.screen ==# 'map'
-    call vimtoria#ui#on_scroll()
+    call s:normalize_scroll()
+    let l:lc = s:win_leftcol()
+    if l:lc != s:cur_leftcol
+      let s:cur_leftcol = l:lc
+      let l:lines = vimtoria#ui#build_lines(l:st)
+      call setbufvar(s:bufnr, '&modifiable', 1)
+      call setbufline(s:bufnr, 1, l:lines)
+      silent! call deletebufline(s:bufnr, len(l:lines) + 1, '$')
+      call setbufvar(s:bufnr, '&modifiable', 0)
+    endif
     call vimtoria#popup#update(s:bufnr, l:st)
   else
     call vimtoria#popup#hide()
@@ -223,7 +281,10 @@ function! vimtoria#ui#render() abort
 endfunction
 
 function! vimtoria#ui#build_lines(st) abort
-  let l:lines = [s:header_line(a:st), s:hint_line(a:st), '']
+  " 地図画面では、右へスクロールしていてもヘッダ・ヒントが読めるよう
+  " 現在の水平スクロール位置まで字下げする(フッタは screens/map が行う)
+  let l:ind = a:st.screen ==# 'map' ? repeat(' ', s:cur_leftcol) : ''
+  let l:lines = [l:ind . s:header_line(a:st), l:ind . s:hint_line(a:st), '']
   if a:st.screen ==# 'map'
     call extend(l:lines, vimtoria#screens#map#render(a:st))
   elseif a:st.screen ==# 'state'

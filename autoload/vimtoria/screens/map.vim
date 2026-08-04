@@ -34,34 +34,37 @@ function! vimtoria#screens#map#render(st) abort
     let l:row += 1
   endfor
   call add(l:lines, '')
+  " フッタ(選択情報・メッセージ・歴史イベントのログ)は、右へスクロール
+  " していても読めるよう、現在の水平スクロール位置まで字下げして描く
+  let l:ind = repeat(' ', vimtoria#ui#map_leftcol())
   let l:stt = l:data.states[l:sel]
   let l:ocid = a:st.world.owner[l:sel]
   let l:country = l:data.countries[l:ocid]
   let l:own = l:ocid ==# a:st.country ? vimtoria#i18n#t('map_own') : ''
-  call add(l:lines, printf(vimtoria#i18n#t('map_selected'),
+  call add(l:lines, l:ind . printf(vimtoria#i18n#t('map_selected'),
         \ vimtoria#i18n#name(l:stt), vimtoria#i18n#name(l:country), l:own,
         \ vimtoria#i18n#pop(l:stt.pop)))
   let l:snames = []
   for l:sid in a:st.world.country_states[l:ocid]
     call add(l:snames, vimtoria#i18n#name(l:data.states[l:sid]))
   endfor
-  call add(l:lines, printf(vimtoria#i18n#t('map_states_of'),
+  call add(l:lines, l:ind . printf(vimtoria#i18n#t('map_states_of'),
         \ vimtoria#i18n#name(l:country),
         \ join(l:snames, vimtoria#i18n#t('list_sep'))))
   if !empty(a:st.msg)
-    call add(l:lines, '  » ' . a:st.msg)
+    call add(l:lines, l:ind . '  » ' . a:st.msg)
   endif
   " 最近の出来事(直近3件)。[-3:] は要素数が3未満だと空になるので使わない
   if !empty(a:st.world.eventlog)
     call add(l:lines, '')
-    call add(l:lines, vimtoria#i18n#t('map_recent'))
+    call add(l:lines, l:ind . vimtoria#i18n#t('map_recent'))
     let l:log = a:st.world.eventlog
     for l:e in l:log[len(l:log) > 3 ? len(l:log) - 3 : 0 :]
-      call add(l:lines, '  ' . l:e)
+      call add(l:lines, l:ind . '  ' . l:e)
     endfor
   endif
   call add(l:lines, '')
-  call add(l:lines, printf(vimtoria#i18n#t('map_world'),
+  call add(l:lines, l:ind . printf(vimtoria#i18n#t('map_world'),
         \ len(l:data.countries), len(l:data.states)))
   return l:lines
 endfunction
