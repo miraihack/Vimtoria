@@ -7,6 +7,7 @@ let s:bufnr = -1
 let s:match_sig = ''
 let s:saved_mouse = v:null
 let s:last_screen = ''
+let s:last_marker = 0
 let s:map_view = {}
 let s:normalizing = 0
 let s:in_render = 0
@@ -69,6 +70,7 @@ function! vimtoria#ui#open() abort
   let s:saved_mouse = &mouse
   set mouse=a
   let s:last_screen = ''
+  let s:last_marker = 0
   let s:map_view = {}
   call s:set_keymaps()
   call vimtoria#ui#apply_matches()
@@ -249,16 +251,24 @@ function! s:render_impl() abort
     let s:last_screen = l:st.screen
   endif
   " メニュー画面ではカーソルを選択行(> 印)へ移す。技術ツリーのような
-  " 画面より長いリストでも、Vim のスクロールで選択行が常に見える
+  " 画面より長いリストでも、Vim のスクロールで選択行が常に見える。
+  " ただし追従するのは選択行が動いたとき(j/k・画面遷移)だけ。
+  " 時間経過による毎ティックの再描画ではカーソルを動かさない
+  " (ユーザーが自分で動かしたカーソルを引き戻さないため)
   if l:st.screen !=# 'map'
     let l:i = 0
+    let l:mline = 0
     for l:line in l:lines
       let l:i += 1
       if l:line =~# '^  > '
-        call win_execute(bufwinid(s:bufnr), 'call cursor(' . l:i . ', 1)')
+        let l:mline = l:i
         break
       endif
     endfor
+    if l:mline > 0 && (l:screen_changed || l:mline != s:last_marker)
+      call win_execute(bufwinid(s:bufnr), 'call cursor(' . l:mline . ', 1)')
+    endif
+    let s:last_marker = l:mline
   endif
   " 世界地図では、端に達したスクロールを巻き戻し、フッタの字下げが
   " ビュー確定後の位置とずれていれば組み直してから、概況を表示する
